@@ -15,3 +15,11 @@ The PEP will be in the "draft" status, indicating it is suitable for general dis
 Review comments from stakeholders and the community will be integrated into the PEP and should be conducted on the mailing lists.
 
 After sufficient review and feedback (at the Author's discretion), PEPs will be moved to the "reviewed" state.  A PEP in this state will be discussed at an Arch Board meeting and, barring significant disagreement, marked "accepted".  PEPs will remain in the accepted state until an implementation is available in the Origin master branch at https://github.com/openshift/origin-server.
+
+
+Participation
+-------------
+
+If there is a significant architectural change that you feel belongs in OpenShift, please discuss it on libra-devel@redhat.com.  If there is sufficient consensus on the change to warrant a PEP, please describe in detail the elements that comprise the PEP in an email to the list.
+
+Template for new PEPs: [template.md](template.md)
