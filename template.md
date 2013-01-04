@@ -1,13 +1,13 @@
-PEP: *number assigned by the arch board*
-Title: *A short title that describes this change*
-Status: draft *|reviewed|accepted|final # Will include a % in the future(
-Author: [Name] <email> *the person who is responsible for sheparding this pep*
-Arch Priority: low|medium|high
-Complexity: 8, 13, 20, 40, 100 *story points*
-Affected Components: *web, api, runtime, cartridges, broker, admin_tools, cli*
-Affected Teams: Runtime (0-5), UI (0-5), Broker (0-5), Enterprise (0-5)
-User Impact: low|medium|high
-Epic: *url to a story, wiki page, or doc*
+PEP: *number assigned by the arch board*  
+Title: *A short title that describes this change*  
+Status: draft *|reviewed|accepted|final  Will include a % in the future*   
+Author: [Name] <email> *the person who is responsible for sheparding this pep*  
+Arch Priority: low|medium|high  
+Complexity: 8, 13, 20, 40, 100 *story points* 
+Affected Components: *web, api, runtime, cartridges, broker, admin_tools, cli*  
+Affected Teams: Runtime (0-5), UI (0-5), Broker (0-5), Enterprise (0-5)  
+User Impact: low|medium|high  
+Epic: *url to a story, wiki page, or doc*  
 
 Abstract
 --------
