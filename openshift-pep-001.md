@@ -4,9 +4,16 @@ Arch Priority: medium
 Complexity: 40
 Affected Components: broker, admin_tools
 User Impact: high
-
-OpenShift Admin Console
-=======================
+PEP: 1  
+Title: Admin Console  
+Status: draft  
+Author: Clayton Coleman <ccoleman@redhat.com>  
+Arch Priority: medium  
+Complexity: 40  
+Affected Components: broker, admin_tools  
+Affected Teams: UI (3), Broker (1), Enterprise (1)  
+User Impact: high  
+Epic:  
 
 Abstract
 --------
