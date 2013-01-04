@@ -1,9 +1,3 @@
-Status: draft
-Author: Clayton Coleman <ccoleman@redhat.com>
-Arch Priority: medium
-Complexity: 40
-Affected Components: broker, admin_tools
-User Impact: high
 PEP: 1  
 Title: Admin Console  
 Status: draft  
