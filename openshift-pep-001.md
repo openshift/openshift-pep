@@ -45,7 +45,7 @@ The console does not need a user or authentication model.  It will be run from s
 
 When users want to extend and enhance the console, it is expected that they will make changes directly to the codebase to add new features (and contribute them back to the community).  The console should avoid non-Rails abstractions wherever possible - we want administrators and developers with only a minimum of Rails experience to be able to make changes to the application.  Rails engines are too complex and difficult to implement.  We should use common Rails patterns whenever possible to reduce duplicate code, but it is acceptable to have a slightly lower standard of completeness vs. a higher level of code clarity and readability.
 
-The console will begin as a read-only experience that makes it easy for administrators to answer questions about the deployment.  If a task requires the user make a change to the data in Mongo, we should inform the user in the console how to accomplish the task using the administrative command line tools and make it as easy as possible for them to run those tasks.  
+The console will initially focus on visualizing the layout of a deployment and assisting administrators in synthesizing information.  If a task requires the user make a change to the data in Mongo, we should inform the user in the console how to accomplish the task using the administrative command line tools and make it as easy as possible for them to run those tasks.  The first objective of the admin console is to enable administrators to easily find or aggregate information that is critical to their understanding of the system.  Over time, additional capabilities will be added to enable greater interaction (within reasonable security limits).
 
 ### Example: Admin needs to view and manage quotas for users who are near their quota limit
 
@@ -119,5 +119,5 @@ Rationale
 ---------
 The admin console should be as simple as possible to maintain and build to provide the maximum return on development investment.  Only a small fraction of the user base will access it (admins) and it should be focused on functional simplicity and retrieval of info.  Admins with a minimal amount of Rails and Mongo experience should be able to extend it to retrieve or alter the display.  By limiting the technologies we employ in the design of the console, we can ensure that the widest possible audience can modify it.  There should be minimal interdependency between the broker and the admin console - limited to only core models - so that it can be easily deployed and launched and to reduce the maintenance impact.  The admin console is designed as read-only for the foreseeable future to avoid the significant investment and security considerations involved in duplicating admin level operations in a CLI and a UI.
 
-* The CLI is decoupled and independent of the admin console.  They will rely on code reuse to avoid development costs.
+* The CLI is decoupled and independent of the admin console.  They will rely on code reuse to reduce development costs.
 
