@@ -1,9 +1,9 @@
 PEP: 002  
 Title: Refactor cartridge and node platform code to lower entry for cartridge authors  
 Status: draft  
-Author: [Jhon Honce] <jhonce@redhat.com>  
+Author: Jhon Honce <jhonce@redhat.com>  
 Arch Priority: high  
-Complexity: 40, 100 (story points)  
+Complexity: 100  
 Affected Components: runtime, cartridges, broker  
 Affected Teams: Runtime (5), UI (0), Broker (1), Enterprise (5) *jwh: Enterprise here is a "different thing"*  
 User Impact: application developer (low), cartridge author (high)  
