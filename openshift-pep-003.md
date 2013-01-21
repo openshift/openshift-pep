@@ -58,7 +58,36 @@ Specification
 ...
 
 ### API Changes:
-...
+The following APIs will return a 307(Temporary Redirect) with the body being the url of the status API for the job:  
+PUT /domains/\<domain_id\>  
+
+POST /user/keys  
+PUT /user/keys/\<key_name\>  
+DELETE /user/keys/\<key_name\>  
+
+POST /domains/\<dom_name\>/applications  
+DELETE /domains/\<dom_name\>/applications/\<app_name\>  
+
+POST /domains/\<dom_name\>/applications/\<app_name\>/events  
+
+POST /domains/\<dom_name\>/applications/\<app_name\>/cartridges  
+DELETE /domains/\<dom_name\>/applications/\<app_name\>/cartridges/\<cart_name\>  
+
+POST /domains/\<dom_name\>/applications/\<app_name\>/cartridges/\<cart_name\>/events  
+
+#### Job Status
+GET /jobs/\<job_id\>  
+
+{"status":["complete"|"queued"|"in_progress"|"failed"], "percent_complete":[null|0.0-100.0]}  
+
+#### List of Job Statuses visible to the user (will require pagination)
+GET /jobs  
+
+#### List of Job Statuses for a domain (will require pagination)
+GET /domains/\<dom_name\>/jobs  
+
+#### List of Job Statuses for an app (will require pagination)
+GET /domains/\<dom_name\>/applications/\<app_name\>/jobs  
 
 Backwards Compatibility
 -----------------------
