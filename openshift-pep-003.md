@@ -1,7 +1,7 @@
 PEP: 3  
 Title: Scheduling of Broker Jobs  
 Status: draft  
-Author: Dan McPherson <dmcphers@redhat.com>
+Author: Dan McPherson <dmcphers@redhat.com>  
 Arch Priority: medium  
 Complexity: 100  
 Affected Components: web, api, broker, cli  
@@ -11,7 +11,7 @@ Epic:
 
 Abstract
 --------
-Today in OpenShift, every operation that goes through the broker is executed immediately.  Adding a scheduler will change any potentially long running processes (anything involving node operations) to involve multiple API calls.  A first call to launch the task (such as create app).  And secondary calls to check the status of the associated job(s).  Clients may choose to hide these requests behind a spinner/progress bar, or they might want to indicate to the user the job has been queued and have the user check the status amongst all of their jobs.  The major advantage of the latter being an immediate response to the user allowing them to move on within the client.
+Today in OpenShift, every operation that goes through the broker is executed immediately.  Adding a scheduler will change any potentially long running processes (anything involving node operations) to involve multiple API calls.  A first call to launch the task (such as create app) and secondary calls to check the status of the associated job(s).  Clients may choose to hide these requests behind a spinner/progress bar, or they might want to indicate to the user the job has been queued and have the user check the status amongst all of their jobs.  The major advantage of the latter being an immediate response to the user allowing them to move on within the client.
 
 Motivation
 ----------
