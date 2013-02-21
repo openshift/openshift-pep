@@ -1,16 +1,13 @@
-PEP: 004
-Title: OpenShift Multi-Geo Support
-Status: draft
-Author: Mike McGrath <mmcgrath@redhat.com>
-Arch Priority: High
-Complexity: 30
-Affected Components: *api, runtime, broker, admin_tools, cli* 
-Affected Teams: Runtime (25%), UI (25%), Broker (50%), Enterprise (N/A)
-User Impact: Medium
-Epic: TBD
-
-Outstanding Questions
----------------------
+PEP: 004  
+Title: OpenShift Multi-Geo Support  
+Status: draft  
+Author: Mike McGrath <mmcgrath@redhat.com>  
+Arch Priority: High  
+Complexity: 30  
+Affected Components: *api, runtime, broker, admin_tools, cli*   
+Affected Teams: Runtime (25%), UI (25%), Broker (50%), Enterprise (N/A)  
+User Impact: Medium  
+Epic: TBD  
 
 Abstract
 --------
