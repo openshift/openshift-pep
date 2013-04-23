@@ -68,9 +68,9 @@ platform and cartridge code. High level design goals:
   4. env variables will continue to be the method of communication between
      cartridges and gears, and other cartridges
 
-See [How To Write An OpenShift Origin Cartridge 2.0](https://github.com/jwhonce/node-documentation/blob/master/README.writing_cartridges.md)
-and [How To Write An OpenShift Origin Node Agent 2.0](https://github.com/jwhonce/node-documentation/blob/master/README.writing_node_agent.md)
-for detailed work flows.
+See [How To Write An OpenShift Origin Cartridge 2.0](https://github.com/openshift/origin-server/blob/master/node/README.writing_cartridges.md)
+and [How To Write An OpenShift Origin Node Agent 2.0](https://github.com/openshift/origin-server/blob/master/node/README.node_module_design.md) for detailed work flows.
+and [How To Write An Application To Host on OpenShift](https://github.com/openshift/origin-server/blob/master/node/README.writing_applications.md) for details on writing applications to be hosted on OpenShift
 
 Backwards Compatibility
 -----------------------
@@ -134,7 +134,7 @@ to these same files.
 ERB was chosen to replace sed to remove the cartridge author needing to
 learn regex for simple variable replacement. 
 
-The 'opt' directory, that is shared by all instantiated cartridge
+The 'usr' directory, that is shared by all instantiated cartridge
 instances via a symlink, was introduced to allow for disk usage savings
 and to ease simple patching.
 
