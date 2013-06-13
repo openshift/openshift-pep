@@ -42,8 +42,8 @@ Specification
 
 #### From the perspective of the scheduler
 1. A high level job is queued (create app) from step 2 above
-1. The scheduler gets to the job and asks the broker to execute create app above and elaborates the high level job.
-1. The broker elaborates the job into a series of smaller steps that can be retried or rolled back.  These elaborated steps are stored in the broker's datastore.
+1. The scheduler gets to the job and asks a broker worker to execute create app above and elaborates the high level job.
+1. The broker worker elaborates the job into a series of smaller steps that can be retried or rolled back.  These elaborated steps are stored in the broker's datastore.
 1. Each of the elaborated jobs are executed and marked as complete.  Failures are retried as appropriate.
 1. Completed jobs are marked accordingly and pruned of elaborated steps.  Consistently failed jobs are logged with an opportunity for admin intervention.
 
