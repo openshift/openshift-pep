@@ -58,7 +58,7 @@ Specification
 ...
 
 ### API Changes:
-The following APIs will return a 307(Temporary Redirect) with the body being the url of the status API for the job:  
+The following APIs will return a 202(Accepted) with the body being the url of the status API for the job:  
 PUT /domains/\<domain_id\>  
 
 POST /user/keys  
