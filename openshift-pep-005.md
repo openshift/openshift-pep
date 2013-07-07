@@ -41,13 +41,15 @@ Specification
 
 Within an OpenShift deployment certain applications may need to be highly available in the event of node, gear, or network failures.  Today, each application is load balanced by a single HAProxy instance within a gear of that application (known as the web load balancer gear).  HTTP traffic to the application DNS entry goes directly to the node containing that gear, through the system proxy, into HAProxy, and then out to other gears on other nodes.
 
-The mapping between application DNS entries, web load balancer gears, and backend web gears is known as the OpenShift routing table.  The OpenShift broker is the system of record for the routing table, with nodes reserving and releasing ports as necessary to satisfy installed cartridges.  The broker also is responsible for reliably updating a DNS registry with application names and correct servers.
+Within an application, gears may also behave as TCP load balancers.  A TCP balancer must perform many of the same roles as the web balancer.  The current web load balancer could be extended to support TCP balancing of arbitrary backends by exposing new external ports and advertising those routes to the broker, or a new TCP balancer cartridge could be created that uses its own gears and also advertises those routes.
+
+The mapping between application DNS entries, load balancer gears, and backend gears is known as the OpenShift **routing table**.  The OpenShift broker is the system of record for the routing table, with nodes reserving and releasing ports as necessary to satisfy installed cartridges.  The broker also is responsible for reliably updating a DNS registry with application names and correct servers.  The routing table is maintained for all endpoints, not just those that are HTTP specific.
 
 This PEP specifies:
 
 *  A reliable system programming interface (routing SPI) on the OpenShift broker for notifying an external system of changes to the global routing table.  The interface will be a Ruby plugin to the broker, and receive a stream of change notifications for the routing table of all applications. A series of default implementations and examples will be provided, starting simply with a message queue and moving up to full OpenStack Quantum API integration.  A set of REST APIs for retrieving the application routing tables will also be provided for clients.
 
-*  A new optional system component - a "router" - that proxies incoming HTTP requests from one or more application DNS entries to nodes, web load balancer gears, or web gears.  The component may also perform load balancing, although that is not its primary objective.  This component is typically two or more servers that are capable of high load proxying with fast failover in the event of problems.  The router is aware of some or all of the state of the OpenShift routing table.
+*  A new optional system component - a "router" - that proxies incoming HTTP requests from one or more application DNS entries to nodes, web load balancer gears, or web gears.  The component may also perform load balancing, although that is not its primary objective.  This component is typically two or more servers that are capable of high load proxying with fast failover in the event of problems.  The router is aware of some or all of the state of the OpenShift routing table.  The router may provide global TCP balancing, or delegate to a TCP load balancing cartridge within an application.  It is the router's responsibility to provide external TCP port mapping on the appropriate DNS address.
 
 *  An OpenShift application should be able to contain multiple web load balancer gears, which distribute the incoming traffic load and provide redundancy.  The system is capable of automatically creating the appropriate web load balancer gears on scale-up and scale-down and also allows an application owner to manage the exact number of web load balancer gears.  Autoscaling should continue to function on the load balancer gears even in the event one or more balancer gears are unavailable.  When an application becomes highly available, it acquires a new DNS entry.
 
@@ -189,6 +191,7 @@ A router component SHOULD perform the following operations:
 A router component MAY perform the following operations:
 
 *  Divide traffic among multiple frontends via multihomed DNS entries
+*  Support global TCP balancing by routing external ports to backends advertised by port/protocol within applications.  Because generic TCP balancing cannot take advantage of virtual hosting, it is expected that a router either listens on  random ports, or listens on multiple physical or virtual IP interfaces at standard ports (3306 for mysql, etc).
 
 It is expected that integrators may choose to use commercial load balancer hardware or software load balancers.
 
@@ -196,6 +199,8 @@ It is expected that integrators may choose to use commercial load balancer hardw
 ### Multiple web load balancer gears per application
 
 OpenShift exposes a single instance of HAProxy within a scalable application today that is bound to the application DNS - that web balancer gear, if down, prevents traffic from reaching the apps.  To that end, an application should be able to activate multiple HAProxies instances and ensure that those instances can properly cooperate to distribute load.  An application should be able to scale cleanly from 1 gear to 1000 gears, with the infrastructure making correct decisions as necessary to allocate new web balancer gears.  
+
+This section deals primarily with HTTP load balancing, although multi-master TCP balancing is an application of the same principles when embedded withxn other web gears.  The implementation of the load balancer cart and the broker's interaciton with it would be similar on a web gear group as on a db gear group.
 
 In general, all load balancers within an app should be considered active, and it is the responsibility of higher infrastructures (routers) to maintain their own mechanism for tracking backend status.  A load balancer gear should be stoppable, just like other gears.
 
