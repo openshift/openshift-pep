@@ -59,7 +59,7 @@ Specification
 
 ### API Changes:
 The following APIs will return a 202(Accepted) with the body being the url of the status API for the job:  
-PUT /domains/\<domain_id\>  
+PUT /domains/\<dom_name\>  
 
 POST /user/keys  
 PUT /user/keys/\<key_name\>  
