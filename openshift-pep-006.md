@@ -1,4 +1,4 @@
-PEP: 006 
+PEP: 006  
 Title: Zero downtime for scaled applications during deployment and restarts  
 Status: draft  
 Author: Andy Goldstein <agoldste@redhat.com>, Dan McPherson <dmcphers@redhat.com>, Clayton Coleman <ccoleman@redhat.com>  
@@ -7,7 +7,7 @@ Complexity: 40 - 100
 Affected Components: web, api, runtime, broker, cli  
 Affected Teams: Runtime (40), UI (20), Broker (8), Enterprise (5)  
 User Impact: low|medium|high  
-Epic: E01 https://trello.com/c/krgSeomK
+Epic: E01 https://trello.com/c/krgSeomK  
 
 Abstract
 --------
