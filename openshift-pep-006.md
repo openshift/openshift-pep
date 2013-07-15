@@ -126,7 +126,7 @@ The following directory structure is proposed:
           artifacts/
       repo -> deployments/20130704_094015-fa93c9b/repo
 
-The **app-root/deployments** directory contains 1 or more deployments in their entirety. A deployment directory name has the following format: [date]_[time]-[deployment id].  The repo directory contains the contents of what will be app-root/repo and the optional artifacts directory contains any ~ rooted content/libraries specified in `sync_artifacts` from managed_files.yml.
+The **app-root/deployments** directory contains 1 or more deployments in their entirety. A deployment directory name has the following format: [date]_[time]-[deployment id].  The repo directory contains the contents of what will be app-root/repo and the optional artifacts directory contains any ~ rooted content/libraries specified in `scaled_artifacts` from managed_files.yml.
 
 **app-root/repo** moves from being a standalone directory to a symlink that points at the active deployment in the deployments directory.
 
@@ -347,7 +347,7 @@ When the platform synchronizes files, the synchronization will happen before all
 ### Additional dependencies
 Some frameworks have external dependencies that are required at build time, run time, or both. These often do not reside with the application's source code and are often downloaded during a build or deployment. Examples include Java dependencies retrieved via Maven, node.js modules, Python virtenv files, etc. We will track the state of these external dependencies per deployment, and be able to tie the set of files that exist at a given point in time to a given deployment.  This will be accomplished by allowing cartridges to specify any additional sync directories in their managed_files.yml.  Ex:
 
-sync_artifacts:
+scaled_artifacts:
 - '.m2/'
 
 These artifacts will be stored with each deployment available for rollback.
