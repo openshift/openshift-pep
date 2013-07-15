@@ -330,7 +330,7 @@ The broker would also make use of the steps in this process, and report data in 
 
 Deploy will also be exposed through a REST API to be used from any non ssh clients.  The REST API will be (non binary deploy):
 
-POST /domains/<dom_name>/applications/<app_name>/events?event=deploy
+`POST /domains/<dom_name>/applications/<app_name>/events?event=deploy`
 
 This operation will perform the build and deploy and take the same options provided through ssh (force_clean_build, git ref, etc).  Output will need to be accessible through standard gear logging facilities.
 
