@@ -3,7 +3,7 @@ Title: Zero downtime for scaled applications during deployment and restarts
 Status: draft  
 Author: Andy Goldstein <agoldste@redhat.com>, Dan McPherson <dmcphers@redhat.com>, Clayton Coleman <ccoleman@redhat.com>  
 Arch Priority: TBD  
-Complexity: 40 - 100
+Complexity: 40 - 100  
 Affected Components: web, api, runtime, broker, cli  
 Affected Teams: Runtime (40), UI (20), Broker (8), Enterprise (5)  
 User Impact: low|medium|high  
@@ -120,13 +120,13 @@ The following directory structure is proposed:
       deployments/
         20130703_081533-9191a7e/
           repo/
-          artifacts/
+          dependencies/
         20130704_094015-fa93c9b/
           repo/
-          artifacts/
+          dependencies/
       repo -> deployments/20130704_094015-fa93c9b/repo
 
-The **app-root/deployments** directory contains 1 or more deployments in their entirety. A deployment directory name has the following format: [date]_[time]-[deployment id].  The repo directory contains the contents of what will be app-root/repo and the optional artifacts directory contains any ~ rooted content/libraries specified in `scaled_artifacts` from managed_files.yml.
+The **app-root/deployments** directory contains 1 or more deployments in their entirety. A deployment directory name has the following format: [date]_[time]-[deployment id].  The repo directory contains the contents of what will be app-root/repo and the dependencies directory contains the contents of app-root/dependencies.
 
 **app-root/repo** moves from being a standalone directory to a symlink that points at the active deployment in the deployments directory.
 
@@ -201,7 +201,7 @@ The proposed format of a binary artifact is as follows:
       .openshift
         ...
       application-specific files
-    artifacts
+    dependencies
       ...
 
 A .war binary deployment artifact might look like this:
@@ -211,7 +211,7 @@ A .war binary deployment artifact might look like this:
         ...
       deployments
         ROOT.war
-    artifacts
+    dependencies
       ...
 
 Essentially the artifact contains exactly what app-root/runtime/repo would have after a build has taken place.
@@ -227,7 +227,7 @@ The following process will take place when `auto_deploy` is disabled, `keep_depl
 1. `d1` is moved/renamed to `app-root/deployments/[date]_[time]-[deployment id]/repo`
 1. The application is stopped
 1. `app-root/repo` is updated to point at the new deployment directory's repo directory
-1. `artifacts` are synced to the gears home directory
+1. `app-root/dependencies` is updated to point at the new deployment directory's dependencies directory
 1. The secondary cartridges are started
 1. The platform's `deploy` command is invoked
 1. The user's `deploy` hook is invoked, if it exists
@@ -247,7 +247,7 @@ This will execute the following sequence of actions:
 1. Stop the application
 1. Delete the current deployment directory pointed to by `app-root/repo`
 1. Update `app-root/repo` to point at the latest entry in `app-root/deployments`, which is the previous deployment now that the active deployment has been deleted
-1. `artifacts` are synced to the gears home directory
+1. Update `app-root/dependencies` to point at the latest entry in `app-root/deployments`, which is the previous deployment now that the active deployment has been deleted
 1. The secondary cartridges are started
 1. The platform's `deploy` command is invoked
 1. The user's `deploy` hook is invoked, if it exists
@@ -330,7 +330,7 @@ The broker would also make use of the steps in this process, and report data in 
 
 Deploy will also be exposed through a REST API to be used from any non ssh clients.  The REST API will be (non binary deploy):
 
-`POST /domains/<dom_name>/applications/<app_name>/events?event=deploy`
+POST /domains/<dom_name>/applications/<app_name>/events?event=deploy
 
 This operation will perform the build and deploy and take the same options provided through ssh (force_clean_build, git ref, etc).  Output will need to be accessible through standard gear logging facilities.
 
@@ -345,13 +345,9 @@ The HAProxy cartridge is currently responsible for synchronizing an application'
 When the platform synchronizes files, the synchronization will happen before all cartridge and user deploy hooks are executed.
 
 ### Additional dependencies
-Some frameworks have external dependencies that are required at build time, run time, or both. These often do not reside with the application's source code and are often downloaded during a build or deployment. Examples include Java dependencies retrieved via Maven, node.js modules, Python virtenv files, etc. We will track the state of these external dependencies per deployment, and be able to tie the set of files that exist at a given point in time to a given deployment.  This will be accomplished by allowing cartridges to specify any additional sync directories in their managed_files.yml.  Ex:
+Some frameworks have external dependencies that are required at build time, run time, or both. These often do not reside with the application's source code and are often downloaded during a build or deployment. Examples include Java dependencies retrieved via Maven, node.js modules, Python virtenv files, etc. We will track the state of these external dependencies per deployment, and be able to tie the set of files that exist at a given point in time to a given deployment.  Cartridges can accomplish this by storing their dependencies under app-root/dependencies and linking to that directory if their framework requires a particular directory structure.  Ex:
 
-scaled_artifacts:
-- '.m2/'
-
-These artifacts will be stored with each deployment available for rollback.
-
+php/phplib -> app-root/dependencies/php/phplib
 
 #### Publisher gears
 1 possible way to implement these changes to deployments is to create a gear that is dedicated to performing builds and deployments to the real application gears. Individual deployments reside on the publisher gear, and they would be synchronized to the real application gears at deployment time. Instead of each application gear being required to maintain a copy of the last 1 or 2 deployments (to support rollback), the publisher gear could house the deployments, limiting the amount of duplication necessary (in the event that every child gear had to have a copy of deployments *n*, *n-1*, and possibly *n-2*.
