@@ -1,6 +1,6 @@
 PEP: 002  
 Title: Refactor cartridge and node platform code to lower entry for cartridge authors  
-Status: draft  
+Status: accepted  
 Author: Jhon Honce <jhonce@redhat.com>  
 Arch Priority: high  
 Complexity: 100  
