@@ -117,16 +117,17 @@ The following describes new ways to deploy a new version of code to an applicati
 The following directory structure is proposed:
 
     app-root/
-      deployments/
-        20130703_081533-9191a7e/
-          repo/
-          dependencies/
-        20130704_094015-fa93c9b/
-          repo/
-          dependencies/
-      repo -> deployments/20130704_094015-fa93c9b/repo
+      repo -> app-deployments/20130704_094015-fa93c9b/repo
+      dependencies -> app-deployments/20130704_094015-fa93c9b/dependencies
+    app-deployments/
+      20130703_081533-9191a7e/
+        dependencies/
+        repo/
+      20130704_094015-fa93c9b/
+        dependencies/
+        repo/
 
-The **app-root/deployments** directory contains 1 or more deployments in their entirety. A deployment directory name has the following format: [date]_[time]-[deployment id].  The repo directory contains the contents of what will be app-root/repo and the dependencies directory contains the contents of app-root/dependencies.
+The **app-deployments** directory contains 1 or more deployments in their entirety. A deployment directory name has the following format: [date]_[time]-[deployment id].  The repo directory contains the contents of what will be app-root/repo and the dependencies directory contains the contents of app-root/dependencies.
 
 **app-root/repo** moves from being a standalone directory to a symlink that points at the active deployment in the deployments directory.
 
@@ -135,7 +136,7 @@ The following process will take place when `auto_deploy` is enabled, `keep_deplo
 
 1. User invokes `git push`
 1. Application is stopped
-1. Active deployment directory in `app-root/deployments` is removed
+1. Active deployment directory in `app-deployments/` is removed
 1. The contents of the git repo for the current deployment branch are unpacked into a temporary directory `d1`
 1. A build is performed
     1. The cartridge's `pre_build` command is invoked
@@ -146,7 +147,7 @@ The following process will take place when `auto_deploy` is enabled, `keep_deplo
     1. Because this is a git deployment, there is no platform-specific action necessary
     1. The user's `prepare` hook is invoked, if it exists
 1. The deployment id is calculated from the contents of `d1`
-1. `d1` is moved/renamed to `app-root/deployments/[date]_[time]-[deployment id]/repo`
+1. `d1` is moved/renamed to `app-deployments/[date]_[time]-[deployment id]/repo`
 1. `app-root/repo` is updated to point at the new deployment directory's repo directory
 1. The secondary cartridges are started
 1. The platform's `deploy` command is invoked
@@ -171,7 +172,7 @@ The following process will take place when `auto_deploy` is enabled, `keep_deplo
     1. Because this is a git deployment, there is no platform-specific action necessary
     1. The user's `prepare` hook is invoked, if it exists
 1. The deployment id is calculated from the contents of `d1`
-1. `d1` is moved/renamed to `app-root/deployments/[date]_[time]-[deployment id]/repo`
+1. `d1` is moved/renamed to `app-deployments/[date]_[time]-[deployment id]/repo`
 1. `app-root/repo` is updated to point at the new deployment directory's repo directory
 1. The secondary cartridges are started
 1. The platform's `deploy` command is invoked
@@ -179,7 +180,7 @@ The following process will take place when `auto_deploy` is enabled, `keep_deplo
 1. The primary cartridge is started
 1. The platform's `post_deploy` command is invoked
 1. The user's `post_deploy` hook is invoked, if it exists
-1. Old deployments are removed until the number of deployments in `app-root/deployments` = the value of `keep_deployments`
+1. Old deployments are removed until the number of deployments in `app-deployments` = the value of `keep_deployments`
 
 ### Binary deployments
 Sometimes it doesn't make sense to use git to deploy an application. Git is not a particularly efficient means of deploying a pre-built Java .war file, for example.
@@ -224,7 +225,7 @@ The following process will take place when `auto_deploy` is disabled, `keep_depl
     1. The file specified by <url> is downloaded and extracted to `d1`
     1. The user's `prepare` hook is invoked, if it exists
 1. The deployment id is calculated from the contents of `d1`
-1. `d1` is moved/renamed to `app-root/deployments/[date]_[time]-[deployment id]/repo`
+1. `d1` is moved/renamed to `app-deployments/[date]_[time]-[deployment id]/repo`
 1. The application is stopped
 1. `app-root/repo` is updated to point at the new deployment directory's repo directory
 1. `app-root/dependencies` is updated to point at the new deployment directory's dependencies directory
@@ -234,7 +235,7 @@ The following process will take place when `auto_deploy` is disabled, `keep_depl
 1. The primary cartridge is started
 1. The platform's `post_deploy` command is invoked
 1. The user's `post_deploy` hook is invoked, if it exists
-1. Old deployments are removed until the number of deployments in `app-root/deployments` = the value of `keep_deployments`
+1. Old deployments are removed until the number of deployments in `app-deployments` = the value of `keep_deployments`
 
 ### Deployment rollback capability
 OpenShift must support an easy way to rollback from one deployment to the previous one. To do so, the previous deployment must be preserved.
@@ -246,8 +247,8 @@ This will execute the following sequence of actions:
 1. Ensure that a previous deployment exists; return error to the user if not
 1. Stop the application
 1. Delete the current deployment directory pointed to by `app-root/repo`
-1. Update `app-root/repo` to point at the latest entry in `app-root/deployments`, which is the previous deployment now that the active deployment has been deleted
-1. Update `app-root/dependencies` to point at the latest entry in `app-root/deployments`, which is the previous deployment now that the active deployment has been deleted
+1. Update `app-root/repo` to point at the latest entry in `app-deployments`, which is the previous deployment now that the active deployment has been deleted
+1. Update `app-root/dependencies` to point at the latest entry in `app-deployments`, which is the previous deployment now that the active deployment has been deleted
 1. The secondary cartridges are started
 1. The platform's `deploy` command is invoked
 1. The user's `deploy` hook is invoked, if it exists
@@ -312,7 +313,7 @@ An example application might consist of 3 redundant head gears, with 10 other sc
     > build f03435b
     Building Git commit f03435b....
     ....
-    Build complete, prepared deployment artifacts in app-root/deployments/20130305_120034-d3948b93
+    Build complete, prepared deployment artifacts in app-deployments/20130305_120034-d3948b93
     Deployment id is d3948b93
     > distribute d3948b93
     Copying d3948b93 to all gears
