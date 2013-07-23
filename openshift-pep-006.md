@@ -47,10 +47,10 @@ New application configuration options are required to support the improved build
 
 * **auto_deploy**
 
-    Possible values: true, yes, 1, false, no, 0
+    Possible values: true, false
     Default: true
 
-    Indicates if OpenShift should build and deploy automatically whenever the user executes `git push`. If not set or if enabled, the current default behavior (to auto deploy) will remain the same.
+    Indicates if OpenShift should build and deploy automatically whenever the user executes `git push`. If not explicitly disabled, the current default behavior (to auto deploy) will remain the same.
 
   If disabled, a `git push` will not result in the latest code being deployed to the application. Instead, the user must use the new `rhc deploy` command described below to initiate a deployment.
 
@@ -117,19 +117,37 @@ The following describes new ways to deploy a new version of code to an applicati
 The following directory structure is proposed:
 
     app-root/
-      repo -> app-deployments/20130704_094015-fa93c9b/repo
-      dependencies -> app-deployments/20130704_094015-fa93c9b/dependencies
+      repo -> app-deployments/20130704_094015/repo
+      dependencies -> app-deployments/20130704_094015/dependencies
+    
     app-deployments/
-      20130703_081533-9191a7e/
+      20130703_081533/
         dependencies/
         repo/
-      20130704_094015-fa93c9b/
+        info/
+          gitref
+          id
+          state
+      20130704_094015/
         dependencies/
         repo/
+        info/
+          gitref
+          id
+          state
+      by-id
+        fa93c9b -> ~/app-deployments/20130704_094015
+        9191a7e -> ~/app-deployments/20130703_081533
+    
+    app-archives/
+      myapp-1.0.tar.gz
+      myapp-2.0
 
-The **app-deployments** directory contains 1 or more deployments in their entirety. A deployment directory name has the following format: [date]_[time]-[deployment id].  The repo directory contains the contents of what will be app-root/repo and the dependencies directory contains the contents of app-root/dependencies.
+The **app-deployments** directory contains 1 or more deployments in their entirety. A deployment directory name has the following format: [date]_[time].  The repo directory contains the contents of what will be app-root/repo. The dependencies directory contains the contents of app-root/dependencies. The info directory contains information about the deployment: the git ref of the deployment (if applicable), the deployment id, and the deployment's state (preparing | prepared | activated).
 
 **app-root/repo** moves from being a standalone directory to a symlink that points at the active deployment in the deployments directory.
+
+The **app-archives** directory contains binary deployment artifacts that are the inputs to the `prepare` platform action.
 
 ### Git deployments - current OpenShift workflow
 The following process will take place when `auto_deploy` is enabled, `keep_deployments` = 1, and the user pushes code to the git repository:
@@ -137,7 +155,8 @@ The following process will take place when `auto_deploy` is enabled, `keep_deplo
 1. User invokes `git push`
 1. Application is stopped
 1. Active deployment directory in `app-deployments/` is removed
-1. The contents of the git repo for the current deployment branch are unpacked into a temporary directory `d1`
+1. A new deployment directory `app-deployments/$date_$time` is created with `repo` and `dependencies` subdirectories
+1. The contents of the git repo for the current deployment branch are unpacked into `app-deployments/$date_$time/repo`
 1. A build is performed
     1. The cartridge's `pre_build` command is invoked
     1. The user's `pre_build` hook is invoked, if it exists
@@ -146,9 +165,10 @@ The following process will take place when `auto_deploy` is enabled, `keep_deplo
 1. The platform's `prepare` command is invoked
     1. Because this is a git deployment, there is no platform-specific action necessary
     1. The user's `prepare` hook is invoked, if it exists
-1. The deployment id is calculated from the contents of `d1`
-1. `d1` is moved/renamed to `app-deployments/[date]_[time]-[deployment id]/repo`
-1. `app-root/repo` is updated to point at the new deployment directory's repo directory
+1. The deployment id is calculated from the contents of the deployment directory
+1. The symlink `app-deployments/by-id/$deployment_id` -> `app-deployments/$date_time` is created
+1. `app-root/repo` is updated to point at `app-deployments/$date_$time/repo`
+1. `app-root/dependencies` is updated to point at `app-deployments/$date_$time/dependencies`
 1. The secondary cartridges are started
 1. The platform's `deploy` command is invoked
 1. The user's `deploy` hook is invoked, if it exists
@@ -161,8 +181,8 @@ The following process will take place when `auto_deploy` is enabled, `keep_deplo
 
 1. User invokes `git push`
 1. The application is stopped
-1. A temporary directory, `d1`, is created
-1. The contents of the git repo for the current deployment branch are unpacked into `d1`
+1. A new deployment directory `app-deployments/$date_$time` is created with `repo` and `dependencies` subdirectories
+1. The contents of the git repo for the current deployment branch are unpacked into `app-deployments/$date_$time`
 1. A build is performed
     1. The cartridge's `pre_build` command is invoked
     1. The user's `pre_build` hook is invoked, if it exists
@@ -171,9 +191,10 @@ The following process will take place when `auto_deploy` is enabled, `keep_deplo
 1. The platform's `prepare` command is invoked
     1. Because this is a git deployment, there is no platform-specific action necessary
     1. The user's `prepare` hook is invoked, if it exists
-1. The deployment id is calculated from the contents of `d1`
-1. `d1` is moved/renamed to `app-deployments/[date]_[time]-[deployment id]/repo`
-1. `app-root/repo` is updated to point at the new deployment directory's repo directory
+1. The deployment id is calculated from the contents of the deployment directory
+1. The symlink `app-deployments/by-id/$deployment_id` -> `app-deployments/$date_time` is created
+1. `app-root/repo` is updated to point at `app-deployments/$date_$time/repo`
+1. `app-root/dependencies` is updated to point at `app-deployments/$date_$time/dependencies`
 1. The secondary cartridges are started
 1. The platform's `deploy` command is invoked
 1. The user's `deploy` hook is invoked, if it exists
@@ -220,15 +241,15 @@ Essentially the artifact contains exactly what app-root/runtime/repo would have 
 The following process will take place when `auto_deploy` is disabled, `keep_deployments` > 0, and the user executes `rhc deploy -a myapp <url>`:
 
 1. User invokes `rhc deploy -a myapp <url>`
-1. A temporary directory, `d1`, is created
+1. A new deployment directory `app-deployments/$date_$time` is created with `repo` and `dependencies` subdirectories
 1. The platform's `prepare` command is invoked
-    1. The file specified by <url> is downloaded and extracted to `d1`
+    1. The file specified by <url> is downloaded and extracted to `app-deployments/$date_$time`
     1. The user's `prepare` hook is invoked, if it exists
-1. The deployment id is calculated from the contents of `d1`
-1. `d1` is moved/renamed to `app-deployments/[date]_[time]-[deployment id]/repo`
+1. The deployment id is calculated from the contents of `app-deployments/$date_$time`
+1. The symlink `app-deployments/by-id/$deployment_id` -> `app-deployments/$date_time` is created
 1. The application is stopped
-1. `app-root/repo` is updated to point at the new deployment directory's repo directory
-1. `app-root/dependencies` is updated to point at the new deployment directory's dependencies directory
+1. `app-root/repo` is updated to point at `app-deployments/$date_$time/repo`
+1. `app-root/dependencies` is updated to point at `app-deployments/$date_$time/dependencies`
 1. The secondary cartridges are started
 1. The platform's `deploy` command is invoked
 1. The user's `deploy` hook is invoked, if it exists
@@ -247,6 +268,7 @@ This will execute the following sequence of actions:
 1. Ensure that a previous deployment exists; return error to the user if not
 1. Stop the application
 1. Delete the current deployment directory pointed to by `app-root/repo`
+1. Delete the current dependencies directory pointed to by `app-root/dependencies`
 1. Update `app-root/repo` to point at the latest entry in `app-deployments`, which is the previous deployment now that the active deployment has been deleted
 1. Update `app-root/dependencies` to point at the latest entry in `app-deployments`, which is the previous deployment now that the active deployment has been deleted
 1. The secondary cartridges are started
@@ -331,7 +353,7 @@ The broker would also make use of the steps in this process, and report data in 
 
 Deploy will also be exposed through a REST API to be used from any non ssh clients.  The REST API will be (non binary deploy):
 
-POST /domains/<dom_name>/applications/<app_name>/events?event=deploy
+`POST /domains/<dom_name>/applications/<app_name>/events?event=deploy`
 
 This operation will perform the build and deploy and take the same options provided through ssh (force_clean_build, git ref, etc).  Output will need to be accessible through standard gear logging facilities.
 
