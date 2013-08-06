@@ -1,7 +1,7 @@
 PEP: 3  
 Title: Scheduling of Broker Jobs  
 Status: draft  
-Author: Dan McPherson <dmcphers@redhat.com>, Abhishek Gupta <abhgupta@redhat.com>, Jordan Liggitt <jliggitt@redhat.com>
+Author: Dan McPherson <dmcphers@redhat.com>, Abhishek Gupta <abhgupta@redhat.com>, Jordan Liggitt <jliggitt@redhat.com> 
 Arch Priority: medium  
 Complexity: 100  
 Affected Components: web, api, broker, cli  
@@ -176,13 +176,12 @@ The job status will contain the following fields in the response to the client:
 + type: [ "create_app" | "add_component" | "start_app" | etc ]
 + title: job title in sentence text (eg: Create application 'xyz')
 + description: Job details or currently running steps in sentence text
-  + This field may not be implemented initially and may be null
 + args: arguments for the corresponding job, stored here to help describe the job
   + Its a hash of key-value pairs
   + The argument list could get big for a few jobs once we allow users to access domains that they don't own
   + __TODO__: Need to investigate the possibility of NOT storing all the arguments
 + child_jobs: array of job_status IDs corresponding to the jobs that are children of this job
-  + The field will be populated as child
+  + The field will be populated as child jobs are created
 + parent_job: ID of the parent job in case this is a child job 
 + state: [ "queued" | "executing" | "reverting" | "complete" ]
 + completion_state: [ "success" | "partial_success" | "failed" ]
@@ -203,6 +202,8 @@ The job status will contain the following fields in the response to the client:
   + In the regular case it will be present only once the state is "complete"
   + In case of failed retries and rollbacks, the result field will include the output of the failures
   + At a later point, we may start storing intermediate results from sub-op executions
+  + In case of retries and eventual success, the result will include success messages from all pending ops (that have output messages)
+  + In case of failures on retries leading to a rollback, the result will include last non-rollback error message 
 + object_type: [ null | "application" | "domain" | "user" | "key" | "cartridge" ]
 + application_id: application ID
 + application_name: application name
