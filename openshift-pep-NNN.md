@@ -21,7 +21,7 @@ In broad terms, the design proposal for this installation tool is as follows:
 * The Origin VM will continue to function as an all-in-one PaaS
 * Additionally, the VM will have a text-based wizard that will assist a user with the following deployment options:
     * "In Place" Role assignment - the VM can take on a specific role in an Origin deployment (broker, node or messaging server)
-    * Puppet deployment - the VM can connect to a bare Fedora instance via SSH and configure it for an Origin role 
+    * Puppet deployment - the VM can connect to a bare Fedora/RHEL/CentOS instance via SSH and configure it for an Origin role 
 	* Puppet script templates - Users can also copy the puppet scripts from the VM to modify and run on their own.
 
 <h3 id="text-based-wizard">The Text-Based Wizard</h3>
@@ -65,9 +65,11 @@ The new wizard will begin with an intro screen that summarizes the user's option
 
 Each choice leads to a follow-on screen, defined below.
 
-<h4 id="oo-wizard-cfg">Recording the System Configuration</h4>
+<h4 id="oo-wizard-cfg">Behind the Scenes: Recording the System Configuration</h4>
 
 When invoked, the oo-wizard utility will look for a configuration file at `~/.openshift/oo-wizard-cfg.yml`. Users can manually specify a config file location by passing an argument to the oo-wizard. As users work with the utility, general information about the Origin system and specific information about the configuration choices the user is making will be recorded here. The Origin VM will be shipped with a default configuration file that describes the all-in-one Origin system running on the VM itself.
+
+The [puppet scripts](#roles-driven-puppet-scripts) that drive the actual system configurations will, in turn, read from the configuration file using [hiera](http://docs.puppetlabs.com/hiera/1/puppet.html). The configuration file will be organized in deference to hiera's [data format requirements](http://docs.puppetlabs.com/hiera/1/data_sources.html#data-format), but with respect to supporting other installation models in the future, hiera's [hierarchies](http://docs.puppetlabs.com/hiera/1/hierarchy.html) and [variable interpolation](http://docs.puppetlabs.com/hiera/1/variables.html) will be avoided in favor of a single, comprehensive file.
 
 <h4 id="multi-instance-deployment">Workflow: Using the VM in a Multi-Instance Deployment</h4>
 
@@ -230,10 +232,16 @@ This workflow simply displays the login information that the `oo-login` utility 
 
 <h3 id="roles-driven-puppet-scripts">Roles-Driven Puppet Scripts</h3>
 
-The new installation options will require the development of roles-driven puppet scripts. From an engineering standpoint, this means that the [current Puppet scripts](https://github.com/openshift/puppet-openshift_origin) will need refactoring. The prerequisite to this work is to agree upon the definition of "reference configurations" that the puppet scripts will build.
+The new installation options will require the development of roles-driven puppet scripts. From an engineering standpoint, this means that the [current Puppet scripts](https://github.com/openshift/puppet-openshift_origin) will need refactoring. Some points to consider here:
+
+* Our [remote deployment](#remote-system-deployment) option should work for target systems that are running Fedora or RHEL/CentOS. In order to get the necessary Ruby packages for the latter case, the scripts will need to make use of Software Collections ([SCL](http://developerblog.redhat.com/2013/01/28/software-collections-on-red-hat-enterprise-linux/)).
+
+* As mentioned in the section on the [wizard configuration file](#oo-wizard-cfg), the revised puppet scripts will use [hiera](http://docs.puppetlabs.com/hiera/1/index.html) to get at the configuration information in `oo-wizard-cfg.yml`.
+
+But first and foremost, the prerequisite to this work is to agree upon the definition of "reference configurations" that the puppet scripts will build.
 
 #### Pre-Determined Reference Configurations
-As implied by the installation options described in the previous section, the puppet scripts will enforce the use of particular services within the Origin system. For instance: while any [AMQP](http://www.amqp.org/)-compliant messaging server will work with OpenShift, the puppet scripts will use [ActiveMQ](http://activemq.apache.org/). The complete breakdown of roles and software packages will be as follows:
+As implied by the installation options described in the [Text-Based Wizard](#text-based-wizard) section, the puppet scripts will enforce the use of particular services within the Origin system. For instance: while any [AMQP](http://www.amqp.org/)-compliant messaging server will work with OpenShift, the puppet scripts will use [ActiveMQ](http://activemq.apache.org/). The complete breakdown of roles and software packages will be as follows:
 
 * Role: Broker
     * Broker RPM
