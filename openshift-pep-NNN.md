@@ -15,6 +15,8 @@ This document describes an improved installation system for OpenShift Origin. Th
 ## Motivation
 This PEP is the continuation of an effort that began with a [call to the OpenShift Origin Community](https://www.openshift.com/blogs/help-us-fix-the-openshift-origin-unboxing-experience) to help improve the system's installation process. Around one hundred community members [participated in a survey](https://www.openshift.com/blogs/survey-results-the-openshift-origin-unboxing-experience) to help us understand what their most important use cases were, and which installation tools would be most valuable to them. Based on the survey results, it seems clear that the all-in-one virtual machine where OpenShift Origin is _showcased_ can also become a platform from which Origin can be _deployed_.
 
+Another major motivation for this work is that anything that is done in to improve the OpenShift Origin installation experience can be applied directly to the OpenShift Enterprise installation experience as well.
+
 ## Specification
 In broad terms, the design proposal for this installation tool is as follows:
 
@@ -22,7 +24,7 @@ In broad terms, the design proposal for this installation tool is as follows:
 * Additionally, the VM will have a text-based wizard that will assist a user with the following deployment options:
     * "In Place" Role assignment - the VM can take on a specific role in an Origin deployment (broker, node or messaging server)
     * Puppet deployment - the VM can connect to a bare Fedora/RHEL/CentOS instance via SSH and configure it for an Origin role 
-	* Puppet script templates - Users can also copy the puppet scripts from the VM to modify and run on their own.
+    * Puppet script templates - Users can also copy the puppet scripts from the VM to modify and run on their own.
 
 <h3 id="text-based-wizard">The Text-Based Wizard</h3>
 
@@ -69,6 +71,12 @@ Each choice leads to a follow-on screen, defined below.
 
 When invoked, the oo-wizard utility will look for a configuration file at `~/.openshift/oo-wizard-cfg.yml`. Users can manually specify a config file location by passing an argument to the oo-wizard. As users work with the utility, general information about the Origin system and specific information about the configuration choices the user is making will be recorded here. The Origin VM will be shipped with a default configuration file that describes the all-in-one Origin system running on the VM itself.
 
+- - -
+
+*Note*: The wizard will also keep a logfile at `~/.openshift/oo-wizard-cfg.log`. This will be overwritten every time the wizard is invoked.
+
+- - -
+
 The [puppet scripts](#roles-driven-puppet-scripts) that drive the actual system configurations will, in turn, read from the configuration file using [hiera](http://docs.puppetlabs.com/hiera/1/puppet.html). The configuration file will be organized in deference to hiera's [data format requirements](http://docs.puppetlabs.com/hiera/1/data_sources.html#data-format), but with respect to supporting other installation models in the future, hiera's [hierarchies](http://docs.puppetlabs.com/hiera/1/hierarchy.html) and [variable interpolation](http://docs.puppetlabs.com/hiera/1/variables.html) will be avoided in favor of a single, comprehensive file.
 
 <h4 id="multi-instance-deployment">Workflow: Using the VM in a Multi-Instance Deployment</h4>
@@ -105,7 +113,7 @@ As the user makes choices, the provided values will be written to [oo-wizard-cfg
 1. If the user reruns the utility, the responses from the file will be suggested as default values
 2. The file can be copied to another VM instance to provide reference values to a system with a different role
 
--  - -
+- - -
 
 **To expand on point #2**: If a user configures their first OpenShift instance to be a Broker, and then copies their configuration file to a new instance, which will be a Node, then the copied file will be able to provide the Node with the Broker instance public IP address.
 
@@ -175,7 +183,7 @@ This workflow is almost identical to the [Multi-Instance Deployment](#multi-inst
     -------------------------------------
     
     What is the hostname or IP address of the target system? []:
-    What login should the wizard use? (Must have root access on <remote_host>) []:
+    What login should the wizard use? (Must have root or sudo access on <remote_host>) []:
     What password should the wizard use? :
     
     <return> - Continue
@@ -183,7 +191,7 @@ This workflow is almost identical to the [Multi-Instance Deployment](#multi-inst
 
 When the remote host name/address and login credentials are provided, the wizard will attempt to connect to the remote system via SSH and confirm that:
 
-* The login user has root access
+* The login user has root (or sudo) access
 * The system has `yum`
 * The necessary RPMs for a complete OpenShift system are available through a `yum search`
 
@@ -237,6 +245,8 @@ The new installation options will require the development of roles-driven puppet
 * Our [remote deployment](#remote-system-deployment) option should work for target systems that are running Fedora or RHEL/CentOS. In order to get the necessary Ruby packages for the latter case, the scripts will need to make use of Software Collections ([SCL](http://developerblog.redhat.com/2013/01/28/software-collections-on-red-hat-enterprise-linux/)).
 
 * As mentioned in the section on the [wizard configuration file](#oo-wizard-cfg), the revised puppet scripts will use [hiera](http://docs.puppetlabs.com/hiera/1/index.html) to get at the configuration information in `oo-wizard-cfg.yml`.
+
+* It should be possible to use the puppet scripts developed for this system to be used in the Origin VM's own build chain.
 
 But first and foremost, the prerequisite to this work is to agree upon the definition of "reference configurations" that the puppet scripts will build.
 
