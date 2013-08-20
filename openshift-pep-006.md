@@ -34,13 +34,13 @@ OpenShift must allow efficient, scalable, and controllable builds and deployment
 
 A **build** is a process that converts source code into a **build result**. A build result is eventually **prepared** for deployment, **distributed** to some or all of an application's gears, and finally **activated** on those gears. The prepare/distribute/activate deployment lifecycle may happen immediately as part of the familiar workflow wherein `git push` builds the application and deploys it. Alternatively, a user may disable automatic deployments and choose instead to deploy in the future via new methods described below.
 
-Build results may be created either inside or outside of OpenShift. Build results created inside OpenShift are created via `git push` and are managed by the platform and/or build cartridges (i.e. Jenkins). Build results created outside of OpenShift must conform to a specific format, and are used as inputs when using the new binary deployment feature. A build result must include the application code and/or anything produced by the application's build process (e.g. a .war file). It is essentially the state of the app-root/repo on the gear after a "build" has been executed (mvn/rake/npm/etc)
+Build results may be created either inside or outside of OpenShift. Build results created inside OpenShift are created via `git push` and are managed by the platform and/or build cartridges (i.e. Jenkins). Build results created outside of OpenShift must conform to a specific format, and are used as inputs when using the new binary deployment feature. A build result must include the application code and/or anything produced by the application's build process (e.g. a .war file). It is essentially the state of the app-root/runtime/repo and app-root/runtime/dependencies on the gear after a "build" has been executed (mvn/rake/npm/etc)
 
-Preparing a build result for deployment involves the execution of a `prepare` platform action and a user-defined `prepare` action hook (if one exists). For OpenShift-managed builds, the prepare platform action is a no-op. For binary deployments, the prepare platform action downloads the external build result if the input is a remote URL. The prepare user action hook is a place where users may execute custom code to modify the build result prior to its distribution to all of the application's gears. An example use case for the prepare action hook is using it to download environment specific files that don't belong in the application's git repository to the build result directory. The build result may optionally be compressed to minimize disk space usage.
+Preparing a build result for deployment involves the execution of a `prepare` platform action and a user-defined `prepare` action hook (if one exists). If the prepare platform action is passed a file as an input, it will extract the file (relative to app-archives) into the specified deployment directory. The prepare user action hook is a place where users may execute custom code to modify the build result prior to its distribution to all of the application's gears. An example use case for the prepare action hook is using it to download environment specific files that don't belong in the application's git repository to the build result directory. The build result may optionally be compressed to minimize disk space usage.
 
-A build result that has been prepared for distribution is a **deployment artifact**. Deployment artifacts have unique identifiers (the sha1 sum of their contents). Once a deployment artifact has been created, it may be distributed to some or all of an application's gears.
+A build result that has been prepared for distribution is a **deployment artifact**. Deployment artifacts have unique identifiers (the sha1 sum of their contents) that are created/calculated by the prepare platform action, after the user-defined prepare action hook has been executed. Once a deployment artifact has been created, it may be distributed to some or all of an application's gears.
 
-After a deployment artifact has been distributed, it may then be activated. Activating a deployment artifact makes it the active code running for a gear. When activating a new deployment artifact, the old deployment artifact may be deleted (e.g., to save space), or it may be preserved. If the prior artifact is preserved, it will now be possible to roll back the active deployment artifact to the previous one, if a user so chooses. 
+After a deployment artifact has been distributed, it may then be activated. Activating a deployment artifact makes it the active code running for a gear. When activating a new deployment artifact, the old deployment artifact may be deleted (e.g., to save space), or it may be preserved. If the prior artifact is preserved, it will now be possible to roll back the active deployment artifact to the previous one, if a user so chooses.
 
 ### New application configuration options
 New application configuration options are required to support the improved build and deployment features. These should be maintained in the broker and made available to the gears as environment variables.
@@ -116,36 +116,41 @@ The following describes new ways to deploy a new version of code to an applicati
 ### Deployment directory structure
 The following directory structure is proposed:
 
-    app-root/
-      repo -> app-deployments/20130704_094015/repo
-      dependencies -> app-deployments/20130704_094015/dependencies
-    
     app-deployments/
-      20130703_081533/
+      2013-08-16_14-36-36.881/
         dependencies/
-        repo/
-        info/
+        metadata/
           gitref
           id
           state
-      20130704_094015/
-        dependencies/
         repo/
-        info/
+        
+      2013-08-16_18-12-15.746/
+        dependencies/
+        metadata/
           gitref
           id
           state
+        repo/
+        
       by-id
-        fa93c9b -> ~/app-deployments/20130704_094015
-        9191a7e -> ~/app-deployments/20130703_081533
-    
+        fa93c9b -> ../2013-08-16_14-36-36.881
+        9191a7e -> ../2013-08-16_18-12-15.746
+        
     app-archives/
       myapp-1.0.tar.gz
-      myapp-2.0
+      myapp-2.0.tar.gz
+      
+    app-root/
+      dependencies -> runtime/dependencies
+      repo -> runtime/repo
+      runtime/
+        dependencies -> ../../app-deployments/2013-08-16_14-36-36.881/dependencies
+        repo -> ../../app-deployments/2013-08-16_14-36-36.881/repo
 
-The **app-deployments** directory contains 1 or more deployments in their entirety. A deployment directory name has the following format: [date]_[time].  The repo directory contains the contents of what will be app-root/repo. The dependencies directory contains the contents of app-root/dependencies. The info directory contains information about the deployment: the git ref of the deployment (if applicable), the deployment id, and the deployment's state (preparing | prepared | activated).
+The **app-deployments** directory contains 1 or more deployments in their entirety. A deployment directory name has the following format: [date]_[time], such as `2013-08-16_14-36-36.881`.  The repo directory contains the contents of what will be in app-root/runtime/repo. The dependencies directory contains the contents of app-root/runtime/dependencies. The metadata directory contains information about the deployment: the git ref of the deployment (if applicable), the deployment id, and the deployment's state (N/A or DEPLOYED).
 
-**app-root/repo** moves from being a standalone directory to a symlink that points at the active deployment in the deployments directory.
+**app-root/runtime/repo** moves from being a standalone directory to a symlink that points at the active deployment in the deployments directory.
 
 The **app-archives** directory contains binary deployment artifacts that are the inputs to the `prepare` platform action.
 
@@ -154,8 +159,10 @@ The following process will take place when `auto_deploy` is enabled, `keep_deplo
 
 1. User invokes `git push`
 1. Application is stopped
-1. Active deployment directory in `app-deployments/` is removed
+1. The cartridge's `pre-repo-archive` command is invoked
 1. A new deployment directory `app-deployments/$date_$time` is created with `repo` and `dependencies` subdirectories
+1. All dependencies from the active deployment (app-root/runtime/dependencies) are moved to `app-deployments/$date_$time/dependencies`
+1. Active deployment directory in `app-deployments/` is removed
 1. The contents of the git repo for the current deployment branch are unpacked into `app-deployments/$date_$time/repo`
 1. A build is performed
     1. The cartridge's `pre_build` command is invoked
@@ -163,45 +170,59 @@ The following process will take place when `auto_deploy` is enabled, `keep_deplo
     1. The cartridge's `build` command is invoked
     1. The user's `build` hook is invoked, if it exists
 1. The platform's `prepare` command is invoked
-    1. Because this is a git deployment, there is no platform-specific action necessary
     1. The user's `prepare` hook is invoked, if it exists
-1. The deployment id is calculated from the contents of the deployment directory
-1. The symlink `app-deployments/by-id/$deployment_id` -> `app-deployments/$date_time` is created
-1. `app-root/repo` is updated to point at `app-deployments/$date_$time/repo`
-1. `app-root/dependencies` is updated to point at `app-deployments/$date_$time/dependencies`
-1. The secondary cartridges are started
-1. The platform's `deploy` command is invoked
-1. The user's `deploy` hook is invoked, if it exists
-1. The primary cartridge is started
-1. The platform's `post_deploy` command is invoked
-1. The user's `post_deploy` hook is invoked, if it exists
+    1. The deployment id is calculated from the contents of the deployment directory
+    1. The symlink `app-deployments/by-id/$deployment_id` is created and points to `../app-deployments/$date_time`
+1. The platform's `distribute` command is invoked
+    1. If the app is scalable, the new deployment will be synced to all child gears
+1. The platform's `activate` command is invoked
+    1. `app-root/runtime/repo` is updated to point at `../../app-deployments/$date_$time/repo`
+    1. `app-root/runtime/dependencies` is updated to point at `../../app-deployments/$date_$time/dependencies`
+    1. The primary cartridge's `update-configuration` control action is invoked
+    1. The secondary cartridges are started
+    1. The primary cartridge's `deploy` control action is invoked
+    1. The user's `deploy` hook is invoked, if it exists
+    1. The primary cartridge is started
+    1. The primary cartridge's `post_deploy` control action is invoked
+    1. The user's `post_deploy` hook is invoked, if it exists
+    1. If the app is scalable and the options did not include --child, for each child gear:
+        1. SSH to the child gear and execute `gear activate $deployment_id --child`
+    1. Write DEPLOYED to app-deployments/$date_$time/metadata/state
 
 ### Git deployments - preserving previous deployments
-The following process will take place when `auto_deploy` is enabled, `keep_deployments` > 0, and the user pushes code to the git repository:
+The following process will take place when `auto_deploy` is enabled, `keep_deployments` > 1, and the user pushes code to the git repository:
 
 1. User invokes `git push`
-1. The application is stopped
+1. Application is stopped
+1. The cartridge's `pre-repo-archive` command is invoked
 1. A new deployment directory `app-deployments/$date_$time` is created with `repo` and `dependencies` subdirectories
-1. The contents of the git repo for the current deployment branch are unpacked into `app-deployments/$date_$time`
+1. All dependencies from the active deployment (app-root/runtime/dependencies) are copied to `app-deployments/$date_$time/dependencies`
+1. The contents of the git repo for the current deployment branch are unpacked into `app-deployments/$date_$time/repo`
 1. A build is performed
     1. The cartridge's `pre_build` command is invoked
     1. The user's `pre_build` hook is invoked, if it exists
     1. The cartridge's `build` command is invoked
     1. The user's `build` hook is invoked, if it exists
 1. The platform's `prepare` command is invoked
-    1. Because this is a git deployment, there is no platform-specific action necessary
     1. The user's `prepare` hook is invoked, if it exists
-1. The deployment id is calculated from the contents of the deployment directory
-1. The symlink `app-deployments/by-id/$deployment_id` -> `app-deployments/$date_time` is created
-1. `app-root/repo` is updated to point at `app-deployments/$date_$time/repo`
-1. `app-root/dependencies` is updated to point at `app-deployments/$date_$time/dependencies`
-1. The secondary cartridges are started
-1. The platform's `deploy` command is invoked
-1. The user's `deploy` hook is invoked, if it exists
-1. The primary cartridge is started
-1. The platform's `post_deploy` command is invoked
-1. The user's `post_deploy` hook is invoked, if it exists
-1. Old deployments are removed until the number of deployments in `app-deployments` = the value of `keep_deployments`
+    1. The deployment id is calculated from the contents of the deployment directory
+    1. The symlink `app-deployments/by-id/$deployment_id` is created and points to `../app-deployments/$date_time`
+1. The platform's `distribute` command is invoked
+    1. If the app is scalable, the new deployment will be synced to all child gears
+1. The platform's `activate` command is invoked
+    1. `app-root/runtime/repo` is updated to point at `../../app-deployments/$date_$time/repo`
+    1. `app-root/runtime/dependencies` is updated to point at `../../app-deployments/$date_$time/dependencies`
+    1. The primary cartridge's `update-configuration` control action is invoked
+    1. The secondary cartridges are started
+    1. The primary cartridge's `deploy` control action is invoked
+    1. The user's `deploy` hook is invoked, if it exists
+    1. The primary cartridge is started
+    1. The primary cartridge's `post_deploy` control action is invoked
+    1. The user's `post_deploy` hook is invoked, if it exists
+    1. If the app is scalable and the options did not include --child, for each child gear:
+        1. SSH to the child gear and execute `gear activate $deployment_id --child`
+    1. Write DEPLOYED to app-deployments/$date_$time/metadata/state
+    1. Starting with the oldest deployment, previous deployments are removed until the number of deployments in `app-deployments` <= the value of `keep_deployments` (if necessary)
 
 ### Binary deployments
 Sometimes it doesn't make sense to use git to deploy an application. Git is not a particularly efficient means of deploying a pre-built Java .war file, for example.
@@ -238,25 +259,31 @@ A .war binary deployment artifact might look like this:
 
 Essentially the artifact contains exactly what app-root/runtime/repo would have after a build has taken place.
 
-The following process will take place when `auto_deploy` is disabled, `keep_deployments` > 0, and the user executes `rhc deploy -a myapp <url>`:
+The following process will take place when `auto_deploy` is disabled, `keep_deployments` > 1, and the user executes `rhc deploy -a myapp <url>`:
 
 1. User invokes `rhc deploy -a myapp <url>`
 1. A new deployment directory `app-deployments/$date_$time` is created with `repo` and `dependencies` subdirectories
 1. The platform's `prepare` command is invoked
     1. The file specified by <url> is downloaded and extracted to `app-deployments/$date_$time`
     1. The user's `prepare` hook is invoked, if it exists
-1. The deployment id is calculated from the contents of `app-deployments/$date_$time`
-1. The symlink `app-deployments/by-id/$deployment_id` -> `app-deployments/$date_time` is created
-1. The application is stopped
-1. `app-root/repo` is updated to point at `app-deployments/$date_$time/repo`
-1. `app-root/dependencies` is updated to point at `app-deployments/$date_$time/dependencies`
-1. The secondary cartridges are started
-1. The platform's `deploy` command is invoked
-1. The user's `deploy` hook is invoked, if it exists
-1. The primary cartridge is started
-1. The platform's `post_deploy` command is invoked
-1. The user's `post_deploy` hook is invoked, if it exists
-1. Old deployments are removed until the number of deployments in `app-deployments` = the value of `keep_deployments`
+    1. The deployment id is calculated from the contents of the deployment directory
+    1. The symlink `app-deployments/by-id/$deployment_id` is created and points to `../app-deployments/$date_time`
+1. The platform's `distribute` command is invoked
+    1. If the app is scalable, the new deployment will be synced to all child gears
+1. The platform's `activate` command is invoked
+    1. `app-root/runtime/repo` is updated to point at `../../app-deployments/$date_$time/repo`
+    1. `app-root/runtime/dependencies` is updated to point at `../../app-deployments/$date_$time/dependencies`
+    1. The primary cartridge's `update-configuration` control action is invoked
+    1. The secondary cartridges are started
+    1. The primary cartridge's `deploy` control action is invoked
+    1. The user's `deploy` hook is invoked, if it exists
+    1. The primary cartridge is started
+    1. The primary cartridge's `post_deploy` control action is invoked
+    1. The user's `post_deploy` hook is invoked, if it exists
+    1. If the app is scalable and the options did not include --child, for each child gear:
+        1. SSH to the child gear and execute `gear activate $deployment_id --child`
+    1. Write DEPLOYED to app-deployments/$date_$time/metadata/state
+    1. Starting with the oldest deployment, previous deployments are removed until the number of deployments in `app-deployments` <= the value of `keep_deployments` (if necessary)
 
 ### Deployment rollback capability
 OpenShift must support an easy way to rollback from one deployment to the previous one. To do so, the previous deployment must be preserved.
@@ -267,16 +294,11 @@ This will execute the following sequence of actions:
 
 1. Ensure that a previous deployment exists; return error to the user if not
 1. Stop the application
-1. Delete the current deployment directory pointed to by `app-root/repo`
-1. Delete the current dependencies directory pointed to by `app-root/dependencies`
-1. Update `app-root/repo` to point at the latest entry in `app-deployments`, which is the previous deployment now that the active deployment has been deleted
-1. Update `app-root/dependencies` to point at the latest entry in `app-deployments`, which is the previous deployment now that the active deployment has been deleted
-1. The secondary cartridges are started
-1. The platform's `deploy` command is invoked
-1. The user's `deploy` hook is invoked, if it exists
-1. The primary cartridge is started
-1. The platform's `post_deploy` command is invoked
-1. The user's `post_deploy` hook is invoked, if it exists
+1. Delete the current deployment directory (`app-root/runtime/repo/..`)
+1. The previous deployment's deployment ID is read from metadata/id
+1. The platform's `activate` command is invoked for the previous deployment ID (see above for details)
+1. If the app is scalable and the options did not include --child, for each child gear:
+    1. SSH to the child gear and execute `gear rollback --child`
 
 ### Types of applications and deployments
 
@@ -304,7 +326,7 @@ The minimum deployment time for scale-replace is described by
 
     T(deploy) = ( N(gears) / N(extra_cap) - 1 ) * ( T(gear_create) + T(gear_deploy) + T(gear_activate) )
 
-where N(gears) is the number of gears in the application, N(extra_cap) is the extra capacity in number of gears, T(gear_create) is the time to create a new gear with an instance of the cartridges, T(gear_deploy) is the time to copy the deployment artifact onto disk from the source, and T(gear_activate) is the time to swap the artifact to the newly deployed version and start the gear.  
+where N(gears) is the number of gears in the application, N(extra_cap) is the extra capacity in number of gears, T(gear_create) is the time to create a new gear with an instance of the cartridges, T(gear_deploy) is the time to copy the deployment artifact onto disk from the source, and T(gear_activate) is the time to swap the artifact to the newly deployed version and start the gear.
 
 The minimum deployment time for in-place is:
 
