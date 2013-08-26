@@ -390,9 +390,9 @@ The HAProxy cartridge is currently responsible for synchronizing an application'
 When the platform synchronizes files, the synchronization will happen before all cartridge and user deploy hooks are executed.
 
 ### Additional dependencies
-Some frameworks have external dependencies that are required at build time, run time, or both. These often do not reside with the application's source code and are often downloaded during a build or deployment. Examples include Java dependencies retrieved via Maven, node.js modules, Python virtenv files, etc. We will track the state of these external dependencies per deployment, and be able to tie the set of files that exist at a given point in time to a given deployment.  Cartridges can accomplish this by storing their dependencies under app-root/dependencies and linking to that directory if their framework requires a particular directory structure.  Ex:
+Some frameworks have external dependencies that are required at build time, run time, or both. These often do not reside with the application's source code and are often downloaded during a build or deployment. Examples include Java dependencies retrieved via Maven, node.js modules, Python virtenv files, etc. We will track the state of these external dependencies per deployment, and be able to tie the set of files that exist at a given point in time to a given deployment.  Cartridges can accomplish this by storing their dependencies under app-root/runtime/dependencies and linking to that directory if their framework requires a particular directory structure.  Ex:
 
-php/phplib -> app-root/dependencies/php/phplib
+php/phplib -> app-root/runtimedependencies/phplib
 
 #### Publisher gears
 1 possible way to implement these changes to deployments is to create a gear that is dedicated to performing builds and deployments to the real application gears. Individual deployments reside on the publisher gear, and they would be synchronized to the real application gears at deployment time. Instead of each application gear being required to maintain a copy of the last 1 or 2 deployments (to support rollback), the publisher gear could house the deployments, limiting the amount of duplication necessary (in the event that every child gear had to have a copy of deployments *n*, *n-1*, and possibly *n-2*.
