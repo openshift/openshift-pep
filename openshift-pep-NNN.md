@@ -10,27 +10,33 @@ User Impact: high
 Epic: [Origin v3 Installation Wizard](https://trello.com/c/H01J2eo4/30-origin-v3-installation-wizard-design)
 
 ## Abstract
-This document describes an improved installation system for OpenShift Origin. The proposed system will use a CLI-based wizard and Puppet scripts to deploy OpenShift onto one or more hosts. The all-in-one VM that is currently used to deliver an all-in-one OpenShift Origin instance will be enhanced to configure itself, via the wizard and scripts, to selectively serve different roles (broker, node, etc.) in a multi-instance deployment.
+This document describes an improved installation system for OpenShift. The proposed system will use a CLI-based installer and [Workflow](#installer-workflows) model to deploy OpenShift onto one or more hosts. As an example of this, one Workflow will target the the VM that is currently used to deliver an all-in-one OpenShift Origin instance. This Workflow will enable the Origin VM to selectively serve one role (Broker, Node, or Message Queue Server) in a multi-instance deployment.
 
 ## Motivation
-This PEP is the continuation of an effort that began with a [call to the OpenShift Origin Community](https://www.openshift.com/blogs/help-us-fix-the-openshift-origin-unboxing-experience) to help improve the system's installation process. Around one hundred community members [participated in a survey](https://www.openshift.com/blogs/survey-results-the-openshift-origin-unboxing-experience) to help us understand what their most important use cases were, and which installation tools would be most valuable to them. Based on the survey results, it seems clear that the all-in-one virtual machine where OpenShift Origin is _showcased_ can also become a platform from which Origin can be _deployed_.
+This PEP is the continuation of an effort that began with a [call to the OpenShift Origin Community](https://www.openshift.com/blogs/help-us-fix-the-openshift-origin-unboxing-experience) to help improve the system's installation process. Around one hundred community members [participated in a survey](https://www.openshift.com/blogs/survey-results-the-openshift-origin-unboxing-experience) to help us understand what their most important use cases were, and which installation tools would be most valuable to them. Based on the survey results, it seems clear that users need more general deployment capabilities beyond the all-in-one virtual machine where OpenShift Origin is showcased.
 
-Another major motivation for this work is that anything that is done in to improve the OpenShift Origin installation experience can be applied directly to the OpenShift Enterprise installation experience as well.
+After an initial peer review, this PEP has been revised to clarify the standalone nature of this installer. Through the instrumentation of Workflows and Tasks, the first release of the installer will include support for the most popular install methods from the Origin survey. However, the installer is designed to be extensible enough to support other scenarios.
 
 ## Specification
 In broad terms, the design proposal for this installation tool is as follows:
 
-* The Origin VM will continue to function as an all-in-one PaaS
-* Additionally, the VM will have a text-based wizard that will assist a user with the following deployment options:
-    * "In Place" Role assignment - the VM can take on a specific role in an Origin deployment (broker, node or messaging server)
-    * Puppet deployment - the VM can connect to a bare Fedora/RHEL/CentOS instance via SSH and configure it for an Origin role 
+* The installer will consist of a text-based wizard that guides a user to:
+	1. Define their OpenShift configuration
+	2. Select an installation Workflow
+	3. Execute the workflow
+* The initial Workflows provided with the installer will include:
+    * "In Place" Role assignment - Specific to the Origin VM, the VM takes on one Role in a multi-VM Origin deployment (Broker, Node or Message Queue Server)
+    * Target system Role assignment - the installer can connect to a yum- and RPM-friendly host and configure it for Role.
     * Puppet script templates - Users can also copy the puppet scripts from the VM to modify and run on their own.
 
-<h3 id="text-based-wizard">The Text-Based Wizard</h3>
+The Roles referenced here are defined in [Simplified Deployment Roles](#simplified-deployment-roles).
+
+<a id="text-based-installer"></a>
+### The Text-Based Installer
 
 The Origin VM completes its boot-up procedure by invoking [oo-login#login()](https://github.com/openshift/puppet-openshift_origin/blob/master/templates/custom_shell/oo-login). This is the method that presents the user with some summary information about the running system:
 
-    OpenShift Origin
+    OpenShift Installer
     ----------------
     
     OpenShift console: https://broker.openshift.local/console
@@ -43,11 +49,11 @@ The Origin VM completes its boot-up procedure by invoking [oo-login#login()](htt
     
     Press any key for root console
 
-This utility will be extended to provide the additional user interaction that is described in this document. It may make sense to rename the utility to `oo-wizard` once this additional development work has been done. Throughout this document, the expanded utility will be referred to as "oo-wizard" to differentiate the proposed functionality from the current.
+This utility will be replaced with a general-purpose package that can provide the additional user interaction that is described in this document. The expanded utility will be called `oo-install` and will function both within the context of the Origin VM and in a standalone capacity for use with other OpenShift distros.
 
-The new wizard will begin with an intro screen that summarizes the user's options:
+The new installer will begin with an intro screen that summarizes the user's options:
 
-    OpenShift Origin
+    OpenShift Installer
     ----------------
     
     Welcome to OpenShift.
@@ -63,150 +69,203 @@ The new wizard will begin with an intro screen that summarizes the user's option
     <2> Install OpenShift on another system
     <3> Download Puppet templates
     <4> See login information for this Origin VM
-    <5> Exit the wizard
+    <5> Exit the installer
 
-Each choice leads to a follow-on screen, defined below.
+The portion of text starting with "This VM is currently running..." and ending with "...select from the following options:" will be read directly from a startup message file that can be modified for use in different contexts (standalone installer vs. packaged with Origin VM).
 
-<h4 id="oo-wizard-cfg">Behind the Scenes: Recording the System Configuration</h4>
+The options presented to the user will come from the Workflows that register themselves with the installer at startup. This is described in greater detail in the [Installer Workflows](#installer-workflows) section.
 
-When invoked, the oo-wizard utility will look for a configuration file at `~/.openshift/oo-wizard-cfg.yml`. Users can manually specify a config file location by passing an argument to the oo-wizard. As users work with the utility, general information about the Origin system and specific information about the configuration choices the user is making will be recorded here. The Origin VM will be shipped with a default configuration file that describes the all-in-one Origin system running on the VM itself.
-
-- - -
-
-*Note*: The wizard will also keep a logfile at `~/.openshift/oo-wizard-cfg.log`. This will be overwritten every time the wizard is invoked.
+<a id="oo-install-cfg"></a>
+#### Recording the System Configuration
+When invoked, the oo-install utility will look for a configuration file at `~/.openshift/oo-install-cfg.yml`. Users can manually specify a config file location by passing an argument to oo-install. As users work with the utility, general information about the Origin system and specific information about the configuration choices the user is making will be recorded here. The Origin VM will be shipped with a default configuration file that describes the all-in-one Origin system running on the VM itself.
 
 - - -
 
-The [puppet scripts](#roles-driven-puppet-scripts) that drive the actual system configurations will, in turn, read from the configuration file using [hiera](http://docs.puppetlabs.com/hiera/1/puppet.html). The configuration file will be organized in deference to hiera's [data format requirements](http://docs.puppetlabs.com/hiera/1/data_sources.html#data-format), but with respect to supporting other installation models in the future, hiera's [hierarchies](http://docs.puppetlabs.com/hiera/1/hierarchy.html) and [variable interpolation](http://docs.puppetlabs.com/hiera/1/variables.html) will be avoided in favor of a single, comprehensive file.
+**NOTE**: The installer will also keep a logfile at `~/.openshift/oo-install-cfg.log`. This will be overwritten every time the installer is invoked.
 
-<h4 id="multi-instance-deployment">Workflow: Using the VM in a Multi-Instance Deployment</h4>
+- - -
 
-The goal of this installation option is to make it possible for a user to set up an entire distributed, multi-instance OpenShift system by running multiple pre-built OpenShift VMs. Normally each VM would run its own complete system, but this installation path turns off services and configures the remaining services to interact with other servers. Those other servers can be other Origin VM instances, or any host that is running a portion of the OpenShift system.
+The default configuration file for the OpenShift VM will look something like this:
 
-    OpenShift Origin: Multi-Instance Deployment
-    -------------------------------------------
+<a href="default-configuration"></a>
+
+    ---
+    Name: OpenShift Installer Configuration
+    Vendor: OpenShift Origin Community
+    Description: This is the configuration file for the OpenShift Installer.
+    Version: 0.0.1
+    Deployment:
+      Brokers:
+        - host: localhost
+          port: 443
+          ssh_port: 22
+          user: admin
+          messaging_port: 61616
+      MQServers:
+        - host: localhost
+          ssh_port: 22
+          user: admin
+          messaging_port: 61616
+      DBServers:
+        - host: localhost
+          ssh_port: 22
+          port: 27017
+          user: admin
+          db_user: admin
+      Nodes:
+        - host: localhost
+          ssh_port: 22
+          user: admin
+          messaging_port: 61616
+
+The configuration file will always contain a Deployment section. This section is intended to store the complete OpenShift deployment in a way that can be used by any Workflow. When a user begins working with a given [Workflow](#installer-workflows), the answers to any Workflow-specific questions will be stored in a section that is keyed to the Workflow's ID.
+
+- - -
+
+**Limitations**: For the first iteration of the installer, multiple hosts will only be supported for the Node role.
+
+- - -
+
+<a id="installer-workflows"></a>
+#### Installer Workflows
+Each installation option presented by the installer will come from a different `Installer::Workflow` object defined in the installer codebase. The function of each Workflow is to do the following:
+
+* Provide an installation option on the text-based installer main page
+* Post questions to the user that are relevant to the Workflow and validate the answers to those questions
+* Summarize the user's responses
+* Trigger an automated installation based on the user's responses
+* Report on the outcome of the installation
+
+The Workflows will be instantiated from a config file located at `<gem_root>/conf/workflows.yml`. Any additional files needed by a workflow can either be provided as URLs (including git://) or in the workflow directory `<gem_root>/workflows/<workflow_id>`. As the user answers the questions for a given Workflow, their responses will be recorded in the `oo-install-cfg.yml` file in a section that is keyed to that Workflow.
+
+The format for every workflow defined in `workflows.yml` is as follows:
+
+    Name: The display name of the workflow
+    ID: A distinct alphanumeric ID for the workflow, used in oo-install-cfg.yml and <gem_root>/workflows/<workflow_id> for namespacing
+    RemoteFiles:
+      - URL for file (including git:// URL)
+      - File 2...
+      - File 3....
+    SkipDeploymentCheck: Default is "N", specifies whether or not to ask the standard Deployment settings questions at the start of the workflow.
+    Questions:
+      - Text: The text of the question to ask
+        Variable: The unique variable name to associate the response with
+        AnswerType: A valid answer type from the HighLine gem (http://highline.rubyforge.org/doc/classes/HighLine/Question.html#M000033)
+      - Question 2...
+      - Question 3...
+    Executable: The full command to be executed to complete the Workflow.
+    ExecuteOnTarget: "Y" or "N"; indicates whether the Executable is run locally or on the target system
+    RequiredRPMS:
+      - <RPM Name> (The name as used by the command "yum install <RPM Name>")
+      - RPM 2
+      - RPM 3
+
+
+##### RemoteFiles
+Files that only live locally in `<gem_root>/workflows/<workflow_id>` do not need to be listed here. Listed remote files are retrieved every time the installer is run even if they are already present in `<gem_root>/workflows/<workflow_id>`.
+
+##### SkipDeploymentCheck
+By default, before the Workflow's questions are asked, the Installer always asks the user if they want to review and modify the settings from the [Deployment section](#default-configuration) of the configuration file. If the user wants to review the settings, they will see a series of screens that list the current info and give the user the opportunity to change that info. This is a valuable first step for most Workflows. However, for Workflows that only provide information to the user without doing any installation work, this flag can be set to skip the Deployment questions altogether.
+
+<a id="workflow-questions"></a>
+##### Questions
+After asking the user to verify the Deployment, the installer starts iterating through the Workflow questions. When an answer already exists in the `oo-install-cfg.yml` file, the installer will present the question using Highline's [answer_or_default()](http://highline.rubyforge.org/doc/classes/HighLine/Question.html#M000030) method. All answers are validated according to the AnswerType setting. A few special AnswerTypes will trigger specific test behaviors as well:
+
+* AnswerType "loginhost" will expect a response of the form "username@<hostname or IP address>:<port (optional)>". When the answer is supplied, the system will attempt to SSH to the target system as the indicated user. If the SSH attempt requires a password, the user will be prompted to enter the password. Once connected, the Installer attempts to determine if the target system meets the [Target System Requirements](#target-system-requirements).
+* AnswerType "mongodbhost" performs similarly, except it attempts to connect to the target system's MongoDB instance.
+* AnswerType "role" causes the system to offer the [Simplified Deployment Roles](#simplified-deployment-roles) as options.
+
+##### Executable
+In the "Executable" string, the keyword "`<workflow_path>`" will be automatically expanded to the full path of "`<gem_root>/workflows/<workflow_id>`". The answers to workflow questions can also be included using the notation "`<q:question_variable>`". For example, if one question had a Variable "openshift_role", its value could be used in the executable like this:
+
+    <workflow_path>/installerific -role <q:openshift_role>
+
+See ExecuteOnTarget for information on how paths are handled on a remote target system.
+
+##### ExecuteOnTarget
+When ExecuteOnTarget is "Y", the installer will implicitly copy the oo-install-cfg.yml file and any workflow-specific files to the remote host. They will be copied to the `$HOME/.openshift` directory and the `$HOME/.openshift/installer/<workflow_id>` directories respectively, and the installer will implicitly modify the Executable string accordingly.
+
+##### RequiredRPMS
+The RPMs listed here should only be the RPMs that must be installed before the Executable can even run (like Ruby or Puppet, for instance). Additional RPM checks, like for the presence of MongoDB on a system to be used for the DBServer [Role](#simplified-deployment-roles), should be checked by the Executable.
+
+<a id="installation-methodology"></a>
+#### Installation Methodology
+The specific installation methodology used by a given Workflow is entirely at the discretion of the Workflow's author. As long as the Workflow's "Executable" string results in the completion of the installation task using values from `oo-install-cfg.yml` (or exits with a non-zero error code in the event of a problem), the installer will function correctly. Some of the [Provided Workflows](#provided-workflows) will use [Puppet](http://puppetlabs.com/) and [hiera](http://docs.puppetlabs.com/hiera/1/puppet.html) to perform installations, but these tools only represent one method of extracting values from the config file and using them complete a Workflow.
+
+<a id="unattended-installations"></a>
+#### Unattended Installations
+The installer supports unattended installation for a given Workflow assuming the following requirements are met:
+
+* The Deployment section of the `oo-install-cfg.yml` file is complete
+* All of the questions for a given Workflow have answers in the config file as well
+* None of the necessary SSH sessions require password authentication (with a caveat; see below)
+
+To perform an unattended installation, the user invokes the installer with an additional argument:
+
+    oo-install -w <workflow ID>
+
+- - -
+
+**The SSH password caveat**: The installer never records SSH passwords in the `oo-install-cfg.yml` file. However, each host entry in the [Deployment section](#default-configuration) of the config file supports the presence of a 'pass' key. When this key is present, the installer will attempt to start the SSH session using this as the password. In this manner, a user can manually edit their config file to add these values and enable unattended installation for these systems.
+
+- - -
+
+<a id="provided-workflows"></a>
+### Provided Workflows
+This section contains the workflows that will be provided with the initial release of the installer.
+
+<a id="multi-instance-deployment"></a>
+#### Use an Origin VM in a Distributed Deployment
+The goal of this Workflow is to make it possible for a user to set up an entire distributed, multi-instance OpenShift system using multiple pre-built OpenShift VMs. By default each VM runs its own complete system, but this installation path turns off services and configures the remaining services to interact with other hosts. Whether the other hosts are Origin VMs or some other system instances is not important as long as they all meet the [Target System Requirements](#target-system-requirements).
+
+    OpenShift Installer: Multi-Instance Deployment
+    ----------------------------------------------
     
     What role should this VM fill in the Origin system?    
-    <1> Broker
-    <2> Node
-    <3> Message queueing server
+    <1> Database server
+    <2> Message queueing server
+    <3> Broker
+    <4> Node
     
     <esc> - Go to main menu
 
-Once a user selects the role for this VM, the wizard will ask relevant configuration questions.
+Once a user selects the role for this VM, the installer calls the Workflow Executable to configure the current Origin VM instance.
 
 - - -
 
-**NOTE**: These roles are defined in more technical detail in the section on [Roles-Driven Puppet Scripts](#roles-driven-puppet-scripts). The specific configuration questions to be asked will be driven by the requirements of those scripts, as well.
+**NOTE**: This Workflow and two of the other three Workflows described here are interesting because they are only meaningful in the context of the Origin VM. The `workflows.yml` file that provides these workflows will only be distributed with the Origin VM; the standalone installer RPM will not include them.
 
 - - -
 
-During the configuration process, value tests will be performed immediately wherever possible. For instance, IP addresses will be pinged and remote services will be connected to. In any instance where remote targets are unreachable, the utility will notify the user but will not _force_ the user to change the value.
+<a id="remote-system-deployment"></a>
+#### Install a Role on a Remote System
+This Workflow causes the Installer to copy data over to a target host and then configure that host to act as one of the [Simplified Deployment Roles](#simplified-deployment-roles) as specified in the [Deployment section](#default-configuration) of the installer configuration.
 
-    Messaging queue server 10.10.0.37 could not be reached.
-    Proceed anyway? <Y|N>
+    OpenShift Installer: Remote System Setup
+    ----------------------------------------
     
-    <esc> - Go to main menu
-
-As the user makes choices, the provided values will be written to [oo-wizard-cfg.yml](#oo-wizard-cfg). Functionally this will serve two purposes:
-
-1. If the user reruns the utility, the responses from the file will be suggested as default values
-2. The file can be copied to another VM instance to provide reference values to a system with a different role
-
-- - -
-
-**To expand on point #2**: If a user configures their first OpenShift instance to be a Broker, and then copies their configuration file to a new instance, which will be a Node, then the copied file will be able to provide the Node with the Broker instance public IP address.
-
-- - -
-
-Once the configuration is complete, the user will be presented with a confirmation screen that summarizes their settings.
-
-    OpenShift Origin: Multi-Instance Deployment
-    -------------------------------------------
-    
-    Confirm these settings to finalize the configuration.    
-    
-    System role:     Role name
-    <Config item>:   <Config value>
-    ...
-    
-    <Y> - Confirm settings
-    <N> - Re-edit settings
-    <esc> - Go to main menu
-
-Upon confirmation, the oo-login script will trigger the reconfiguration of the running instance.
-
-    OpenShift Origin: Multi-Instance Deployment
-    -------------------------------------------
-    
-    <role_name> setup complete! To setup other components of the system, copy
-    
-        ~/.openshift/oo-wizard-cfg.yml
-    
-    to the next participating host and rerun oo-wizard there.
-    
-    <esc> - Go to main menu
-    <X> - Exit to the bash shell
-
-Once a system has been configured as part of a multi-instance deployment, the main menu of the utility will appear slightly different:
-
-    OpenShift Origin
-    ----------------
-    
-    Welcome to OpenShift.
-    
-    This VM is currently performing as a <role_name> instance in a
-    multi-instance deployment. You can connect to <it/this system's broker> by
-    pointing your browser to:
-    
-    https://<broker_ip_address>/console
-    
-    To do more with this VM, select from the following options:
-    
-    <1> Install OpenShift on another system
-    <2> Download Puppet templates
-    <X> Exit the wizard
-
-This behavior is triggered by status information from `~/.openshift/oo-wizard-cfg.yml`.
-
-- - -
-
-**Limitations:** Currently, oo-login is only provided with the Origin VM. It is not included with the Origin RPMs. Therefore the ability to transfer and reuse the wizard configuration file is limited to instances of the Origin VM. However - as described in the next section, a single VM instance can also be used to configure arbitrary remote Fedora hosts to perform the various Origin roles. This instance can rely on its single copy of the config file to keep state for the remote systems that are being set up.
-
-- - -
-
-<h4 id="remote-system-deployment">Workflow: Installing OpenShift on Remote Systems</h4>
-
-This workflow is almost identical to the [Multi-Instance Deployment](#multi-instance-deployment) with the notable exception that the configuration work must be performed on a remote system. The concept of instance roles will be reused here, which means that the same set of Puppet scripts can be maintained for both workflows.
-
-    OpenShift Origin: Remote System Setup
-    -------------------------------------
-    
-    What is the hostname or IP address of the target system? []:
-    What login should the wizard use? (Must have root or sudo access on <remote_host>) []:
-    What password should the wizard use? :
+    Which role do you want to deploy?
+    <1> Database server
+    <2> Message queueing server
+    <3> Broker
+    <4> Node
     
     <return> - Continue
     <esc> - Go to main menu
 
-When the remote host name/address and login credentials are provided, the wizard will attempt to connect to the remote system via SSH and confirm that:
+Once a role is selected, the connection details are read from the Deployment settings. If the Node role is selected and more than one Node is defined, the wizard will ask which instance to deploy.
 
-* The login user has root (or sudo) access
-* The system has `yum`
-* The necessary RPMs for a complete OpenShift system are available through a `yum search`
+When the target host is identified, the installer will attempt to connect to the remote system via SSH. Because this Workflow starts with confirmation of the Deployment settings, the installer can assume at this point that the target host meets the [Target System Requirements](#target-system-requirements).
 
-Provided the remote system passes these checks, the utility enters the workflow described in the [Multi-Instance Deployment](#multi-instance-deployment), updating the [wizard config file](#oo-wizard-cfg) as indicated.
+#### Download Puppet Templates
+Origin VM only; this workflow exists simply to call attention to the various ways that users can gain access to the Puppet templates that are used by the installer.
 
-#### Workflow: Download Puppet Templates
-This workflow exists simply to call attention to the various ways that users can gain access to the Puppet templates that are used by the installation wizard.
-
-    OpenShift Origin: Puppet Templates Download
-    -------------------------------------------
+    OpenShift Installer: Puppet Templates Download
+    ----------------------------------------------
     
-    The templates that are packaged with this Origin VM can be downloaded by
-    pointing your web browser at:
+    The templates that are packaged with this Origin VM are located at:
     
-        https://broker.openshift.local/puppet_templates.zip
+        /root/puppet_templates.zip
     
     The latest versions of the puppet templates are always available on GitHub:
     
@@ -214,13 +273,13 @@ This workflow exists simply to call attention to the various ways that users can
     
     <esc> - Go to main menu
 
-The only technical requirement is that the Origin VM packager will need to be instrumented to create and place the zip file referenced in the wizard.
+The only technical requirement is that the Origin VM packager will need to be instrumented to create and place the zip file referenced in the installer.
 
-#### Workflow: Display VM Login Info
+#### Display VM Login Info
 This workflow simply displays the login information that the `oo-login` utility displayed by default.
 
-    OpenShift Origin: Login Details
-    -------------------------------
+    OpenShift Origin VM Login Details
+    ---------------------------------
     
     To connect to this Origin VM, use the following information:
     
@@ -232,67 +291,43 @@ This workflow simply displays the login information that the `oo-login` utility 
     SSH user:   openshift
     Password:   openshift
 
-- - -
-
-**NOTE**: This screen is not available to users after the current VM has been made a part of a [Multi-Instance Deployment](#multi-instance-deployment). This is because the multi-instance deployment requires the user to change the passwords on the VM to increase security.
-
-- - -
-
-<h3 id="roles-driven-puppet-scripts">Roles-Driven Puppet Scripts</h3>
-
-The new installation options will require the development of roles-driven puppet scripts. From an engineering standpoint, this means that the [current Puppet scripts](https://github.com/openshift/puppet-openshift_origin) will need refactoring. Some points to consider here:
-
-* Our [remote deployment](#remote-system-deployment) option should work for target systems that are running Fedora or RHEL/CentOS. In order to get the necessary Ruby packages for the latter case, the scripts will need to make use of Software Collections ([SCL](http://developerblog.redhat.com/2013/01/28/software-collections-on-red-hat-enterprise-linux/)).
-
-* As mentioned in the section on the [wizard configuration file](#oo-wizard-cfg), the revised puppet scripts will use [hiera](http://docs.puppetlabs.com/hiera/1/index.html) to get at the configuration information in `oo-wizard-cfg.yml`.
-
-* It should be possible to use the puppet scripts developed for this system to be used in the Origin VM's own build chain.
-
-But first and foremost, the prerequisite to this work is to agree upon the definition of "reference configurations" that the puppet scripts will build.
-
-#### Pre-Determined Reference Configurations
-As implied by the installation options described in the [Text-Based Wizard](#text-based-wizard) section, the puppet scripts will enforce the use of particular services within the Origin system. For instance: while any [AMQP](http://www.amqp.org/)-compliant messaging server will work with OpenShift, the puppet scripts will use [ActiveMQ](http://activemq.apache.org/). The complete breakdown of roles and software packages will be as follows:
-
-* Role: Broker
-    * Broker RPM
-    * MongoDB
-    * MCollective
-* Role: Node
-    * Node RPM
-    * MCollective
-* Role: Message queueing server
-    * ActiveMQ
-
-The major design goals of the roles-driven Puppet scripts will be:
-
-1. To support both the [Multi-Instance Deployment](#multi-instance-deployment) and the [Remote System Deployment](#remote-system-deployment) from the same scripts
-2. To support the deployment of multiple roles to the same host
-
-#### Configuration: Broker Role
-The information required to configure the Broker role is as follows:
-
-**TBD**
-
-#### Configuration: Node Role
-The information required to configure the Node role is as follows:
-
-**TBD**
-
-#### Configuration: Message Queueing Server Role
-The information required to configure the message queuing server role is as follows:
-
-**TBD**
 
 ## Backwards Compatibility
 Most of the work that needs to be done will be done in the [puppet-openshift_origin](https://github.com/openshift/puppet-openshift_origin) repository, so from that perspective, impact on the rest of the Origin codebase will be limited. Any changes that have to be made to meet the requirements of the [roles-driven puppet scripts](#roles-driven-puppet-scripts) may affect any downstream puppet repos.
 
 ## Rationale
-**Why a Text-Based Wizard?**  
-The choice to use a text-based wizard for this installer was two-fold. First off, per the [survey](https://www.openshift.com/blogs/survey-results-the-openshift-origin-unboxing-experience), the option of a more graphical installer was low in popularity. Point number two is that a text-based installer can deliver a better user experience while reusing techology that was already there in the form of `oo-login`.
+The follow sections explain design considerations that were necessary to define reasonable bounds for this PEP.
 
-**Why Puppet?**  
-On the actual instrumentation side, it is possible that the two most popular deployment methods (Puppet script templates and the mutli-instance VM deployment)  can be deployed using the same set of Puppet scripts. This PEP actually includes a third derivative of this instrumentation as well--the ability to deploy a [Role](#roles-driven-puppet-scripts) to an arbitrary host. While the same resultant functionality can probably be delivered by Chef or Ansible, we already have the foundation laid for Puppet and the feedback for Puppet was very strong.
+### Text-Based Installer
+The choice to use a text-based installer for this installer was two-fold. First off, per the [survey](https://www.openshift.com/blogs/survey-results-the-openshift-origin-unboxing-experience), the option of a more graphical installer was low in popularity. Second, a text-based installer lends itself to use with [unattended installations](#unattended-installations).
 
-**Where Did "Roles-Driven Deployment" Come From?**  
-This facet of the installation problem wasn't directly addressed by the survey, but delivering upon the multi-instance deployment means making decisions up front about the tools to be used and the division of labor between roles. It is true that the configuration of the roles [as defined](#roles-driven-puppet-scripts) is only one of many viable OpenShift Origin deployments, and users who want to further modify their deployments are not locked in by the roles. That said, defining these roles paves the way for easy multi-instance setup and will also help focus the efforts of users that are interested in replacing Puppet with other configuration options.
+### Workflows
+The Workflow concept enables this OpenShift installer to be easily reconfigured different deployment scenarios. By providing different `workflow.yml` files, oo-install RPMs can be customized to different distributions and environments.
 
+<a id="simplified-deployment-roles"></a>
+### Simplified Deployment Roles
+In order to deliver a basic, functional deployment on one or more target hosts, the Workflows that initially ship with the installer will split all of the components of OpenShift into four basic roles, using the specific software as indicated:
+
+* Role: Broker
+    * Broker RPM
+    * MCollective
+* Role: Node
+    * Node RPM
+    * MCollective
+* Role: MQServer
+    * ActiveMQ
+    * MCollective
+* Role: DBServer
+    * MongoDB
+
+This division of labor will not satisfy every deployment. The intent is to provide the administrator with a working OpenShift system that can be incrementally adjusted to suit the specific needs of a given environment.
+
+<a id="target-system-requirements"></a>
+### Target System Requirements
+The installer does not create target systems from bare metal. The following expectations are tested by the installer for every target system.
+
+1. The system is running and accessible via SSH with the specified user and ssh port. If the SSH session requires password authentication, the installer will ask for the password and pass it through to the SSH authentication but will not record it in the `oo-install-cfg.yml` file. See [Unattended Installations](#unattended-installations) for more comments on this.
+2. The SSH user is root, or has sudo access.
+3. The system has `yum` and can install packages from RPMs.
+
+Placing the starting point for the installer at this level greatly simplifies the system's initial requirements. Later iterations of the installer may re-introduce some greater level of bare-metal assembly.
