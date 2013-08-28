@@ -32,6 +32,7 @@ In broad terms, the design proposal for this installation tool is as follows:
 The Roles referenced here are defined in [Simplified Deployment Roles](#simplified-deployment-roles).
 
 <a id="text-based-installer"></a>
+
 ### The Text-Based Installer
 
 The Origin VM completes its boot-up procedure by invoking [oo-login#login()](https://github.com/openshift/puppet-openshift_origin/blob/master/templates/custom_shell/oo-login). This is the method that presents the user with some summary information about the running system:
@@ -76,6 +77,7 @@ The portion of text starting with "This VM is currently running..." and ending w
 The options presented to the user will come from the Workflows that register themselves with the installer at startup. This is described in greater detail in the [Installer Workflows](#installer-workflows) section.
 
 <a id="oo-install-cfg"></a>
+
 #### Recording the System Configuration
 When invoked, the oo-install utility will look for a configuration file at `~/.openshift/oo-install-cfg.yml`. Users can manually specify a config file location by passing an argument to oo-install. As users work with the utility, general information about the Origin system and specific information about the configuration choices the user is making will be recorded here. The Origin VM will be shipped with a default configuration file that describes the all-in-one Origin system running on the VM itself.
 
@@ -127,6 +129,7 @@ The configuration file will always contain a Deployment section. This section is
 - - -
 
 <a id="installer-workflows"></a>
+
 #### Installer Workflows
 Each installation option presented by the installer will come from a different `Installer::Workflow` object defined in the installer codebase. The function of each Workflow is to do the following:
 
@@ -168,6 +171,7 @@ Files that only live locally in `<gem_root>/workflows/<workflow_id>` do not need
 By default, before the Workflow's questions are asked, the Installer always asks the user if they want to review and modify the settings from the [Deployment section](#default-configuration) of the configuration file. If the user wants to review the settings, they will see a series of screens that list the current info and give the user the opportunity to change that info. This is a valuable first step for most Workflows. However, for Workflows that only provide information to the user without doing any installation work, this flag can be set to skip the Deployment questions altogether.
 
 <a id="workflow-questions"></a>
+
 ##### Questions
 After asking the user to verify the Deployment, the installer starts iterating through the Workflow questions. When an answer already exists in the `oo-install-cfg.yml` file, the installer will present the question using Highline's [answer_or_default()](http://highline.rubyforge.org/doc/classes/HighLine/Question.html#M000030) method. All answers are validated according to the AnswerType setting. A few special AnswerTypes will trigger specific test behaviors as well:
 
@@ -189,10 +193,12 @@ When ExecuteOnTarget is "Y", the installer will implicitly copy the oo-install-c
 The RPMs listed here should only be the RPMs that must be installed before the Executable can even run (like Ruby or Puppet, for instance). Additional RPM checks, like for the presence of MongoDB on a system to be used for the DBServer [Role](#simplified-deployment-roles), should be checked by the Executable.
 
 <a id="installation-methodology"></a>
+
 #### Installation Methodology
 The specific installation methodology used by a given Workflow is entirely at the discretion of the Workflow's author. As long as the Workflow's "Executable" string results in the completion of the installation task using values from `oo-install-cfg.yml` (or exits with a non-zero error code in the event of a problem), the installer will function correctly. Some of the [Provided Workflows](#provided-workflows) will use [Puppet](http://puppetlabs.com/) and [hiera](http://docs.puppetlabs.com/hiera/1/puppet.html) to perform installations, but these tools only represent one method of extracting values from the config file and using them complete a Workflow.
 
 <a id="unattended-installations"></a>
+
 #### Unattended Installations
 The installer supports unattended installation for a given Workflow assuming the following requirements are met:
 
@@ -211,10 +217,12 @@ To perform an unattended installation, the user invokes the installer with an ad
 - - -
 
 <a id="provided-workflows"></a>
+
 ### Provided Workflows
 This section contains the workflows that will be provided with the initial release of the installer.
 
 <a id="multi-instance-deployment"></a>
+
 #### Use an Origin VM in a Distributed Deployment
 The goal of this Workflow is to make it possible for a user to set up an entire distributed, multi-instance OpenShift system using multiple pre-built OpenShift VMs. By default each VM runs its own complete system, but this installation path turns off services and configures the remaining services to interact with other hosts. Whether the other hosts are Origin VMs or some other system instances is not important as long as they all meet the [Target System Requirements](#target-system-requirements).
 
@@ -222,7 +230,7 @@ The goal of this Workflow is to make it possible for a user to set up an entire 
     ----------------------------------------------
     
     What role should this VM fill in the Origin system?    
-    <1> Database server
+    <1> Database server	
     <2> Message queueing server
     <3> Broker
     <4> Node
@@ -238,20 +246,20 @@ Once a user selects the role for this VM, the installer calls the Workflow Execu
 - - -
 
 <a id="remote-system-deployment"></a>
+
 #### Install a Role on a Remote System
 This Workflow causes the Installer to copy data over to a target host and then configure that host to act as one of the [Simplified Deployment Roles](#simplified-deployment-roles) as specified in the [Deployment section](#default-configuration) of the installer configuration.
 
     OpenShift Installer: Remote System Setup
-    ----------------------------------------
     
-    Which role do you want to deploy?
-    <1> Database server
-    <2> Message queueing server
-    <3> Broker
-    <4> Node
+    Which role do you want to deploy?  
+    <1> Database server  
+    <2> Message queueing server  
+    <3> Broker  
+    <4> Node  
     
-    <return> - Continue
-    <esc> - Go to main menu
+    <return> - Continue  
+    <esc> - Go to main menu  
 
 Once a role is selected, the connection details are read from the Deployment settings. If the Node role is selected and more than one Node is defined, the wizard will ask which instance to deploy.
 
@@ -305,6 +313,7 @@ The choice to use a text-based installer for this installer was two-fold. First 
 The Workflow concept enables this OpenShift installer to be easily reconfigured different deployment scenarios. By providing different `workflow.yml` files, oo-install RPMs can be customized to different distributions and environments.
 
 <a id="simplified-deployment-roles"></a>
+
 ### Simplified Deployment Roles
 In order to deliver a basic, functional deployment on one or more target hosts, the Workflows that initially ship with the installer will split all of the components of OpenShift into four basic roles, using the specific software as indicated:
 
@@ -323,6 +332,7 @@ In order to deliver a basic, functional deployment on one or more target hosts, 
 This division of labor will not satisfy every deployment. The intent is to provide the administrator with a working OpenShift system that can be incrementally adjusted to suit the specific needs of a given environment.
 
 <a id="target-system-requirements"></a>
+
 ### Target System Requirements
 The installer does not create target systems from bare metal. The following expectations are tested by the installer for every target system.
 
