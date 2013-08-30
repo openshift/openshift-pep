@@ -4,7 +4,7 @@ Status: draft
 Author: N. Harrison Ripps <hripps@redhat.com>  
 Arch Priority: _TBD_  
 Complexity: 40  
-Affected Components: runtime, cartridges, broker, admin_tools  
+Affected Components: admin_tools  
 Affected Teams: UI (1), Origin (1)  
 User Impact: high  
 Epic: [Origin v3 Installation Wizard](https://trello.com/c/H01J2eo4/30-origin-v3-installation-wizard-design)
@@ -174,6 +174,7 @@ After asking the user to verify the Deployment, the installer starts iterating t
 * **_remotehost_** will expect a response of the form "username@<hostname or IP address>:<port (optional)>". When the answer is supplied, the system will attempt to SSH to the target system as the indicated user. If the SSH attempt requires a password, the user will be prompted to enter the password. Once connected, the Installer attempts to determine if the target system meets the [Target System Requirements](#target-system-requirements).
 * **_mongodbhost_** performs similarly, except it attempts to connect to the target system's MongoDB instance.
 * **_role_** causes the system to offer the [Simplified Deployment Roles](#simplified-deployment-roles) as options.
+* **_rolehost_** - This question must follow the **_role_** question; it presents a list of the hosts for the indicated role in the `oo-install-cfg.yml` file or automatically selects the host if only one is defined for that role.
 
 ##### Executable
 In the "Executable" string, the keyword "`<workflow_path>`" will be automatically expanded to the full path of "`<gem_root>/workflows/<workflow_id>`". The answers to workflow questions can also be included using the notation "`<q:question_variable>`". For example, if one question had a Variable "openshift_role", its value could be used in the executable like this:
