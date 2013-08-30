@@ -25,16 +25,14 @@ In broad terms, the design proposal for this installation tool is as follows:
 	2. Select an installation Workflow
 	3. Execute the workflow
 * The initial Workflows provided with the installer will include:
-    * "In Place" Role assignment - Specific to the Origin VM, the VM takes on one Role in a multi-VM Origin deployment (Broker, Node or Message Queue Server)
-    * Target system Role assignment - the installer can connect to a yum- and RPM-friendly host and configure it for Role.
-    * Puppet script templates - Users can also copy the puppet scripts from the VM to modify and run on their own.
+    * [Origin VM Role assignment](#workflow-use-an-origin-vm-in-a-distributed-deployment) - Specific to the Origin VM, the VM takes on one Role in a multi-VM Origin deployment (Broker, Node or Message Queue Server)
+    * [Remote system Role assignment](#workflow-install-a-role-on-a-remote-system) - the installer connects to a [compatible host](#target-system-requirements) via SSH and configures it for a given Role.
+    * [Local system Role assignment](#workflow-install-a-role-on-the-local-system) - the installer configures the local host for a given Role.
+    * [Puppet script templates](#workflow-download-puppet-templates) - Users can also copy the puppet scripts from the VM to modify and run on their own.
 
 The Roles referenced here are defined in [Simplified Deployment Roles](#simplified-deployment-roles).
 
-<a id="text-based-installer"></a>
-
 ### The Text-Based Installer
-
 The Origin VM completes its boot-up procedure by invoking [oo-login#login()](https://github.com/openshift/puppet-openshift_origin/blob/master/templates/custom_shell/oo-login). This is the method that presents the user with some summary information about the running system:
 
     OpenShift Installer
@@ -76,8 +74,6 @@ The portion of text starting with "This VM is currently running..." and ending w
 
 The options presented to the user will come from the Workflows that register themselves with the installer at startup. This is described in greater detail in the [Installer Workflows](#installer-workflows) section.
 
-<a id="oo-install-cfg"></a>
-
 #### Recording the System Configuration
 When invoked, the oo-install utility will look for a configuration file at `~/.openshift/oo-install-cfg.yml`. Users can manually specify a config file location by passing an argument to oo-install. As users work with the utility, general information about the Origin system and specific information about the configuration choices the user is making will be recorded here. The Origin VM will be shipped with a default configuration file that describes the all-in-one Origin system running on the VM itself.
 
@@ -87,9 +83,10 @@ When invoked, the oo-install utility will look for a configuration file at `~/.o
 
 - - -
 
-The default configuration file for the OpenShift VM will look something like this:
+<a id="default-configuration"></a>
 
-<a href="default-configuration"></a>
+##### Default Configuration
+The default configuration file for the OpenShift VM will look something like this:
 
     ---
     Name: OpenShift Installer Configuration
@@ -143,7 +140,8 @@ The Workflows will be instantiated from a config file located at `<gem_root>/con
 
 The format for every workflow defined in `workflows.yml` is as follows:
 
-    Name: The display name of the workflow
+    Name: The name of the workflow
+    Description: The text displayed by the installer in the workflow list
     ID: A distinct alphanumeric ID for the workflow, used in oo-install-cfg.yml and <gem_root>/workflows/<workflow_id> for namespacing
     RemoteFiles:
       - URL for file (including git:// URL)
@@ -153,11 +151,11 @@ The format for every workflow defined in `workflows.yml` is as follows:
     Questions:
       - Text: The text of the question to ask
         Variable: The unique variable name to associate the response with
-        AnswerType: A valid answer type from the HighLine gem (http://highline.rubyforge.org/doc/classes/HighLine/Question.html#M000033)
+        AnswerType: An answer type, see the section below for details.
       - Question 2...
       - Question 3...
     Executable: The full command to be executed to complete the Workflow.
-    ExecuteOnTarget: "Y" or "N"; indicates whether the Executable is run locally or on the target system
+    RemoteDeployment: "Y" or "N"; indicates whether the Executable is run locally or on the target system
     RequiredRPMS:
       - <RPM Name> (The name as used by the command "yum install <RPM Name>")
       - RPM 2
@@ -170,14 +168,12 @@ Files that only live locally in `<gem_root>/workflows/<workflow_id>` do not need
 ##### SkipDeploymentCheck
 By default, before the Workflow's questions are asked, the Installer always asks the user if they want to review and modify the settings from the [Deployment section](#default-configuration) of the configuration file. If the user wants to review the settings, they will see a series of screens that list the current info and give the user the opportunity to change that info. This is a valuable first step for most Workflows. However, for Workflows that only provide information to the user without doing any installation work, this flag can be set to skip the Deployment questions altogether.
 
-<a id="workflow-questions"></a>
-
 ##### Questions
 After asking the user to verify the Deployment, the installer starts iterating through the Workflow questions. When an answer already exists in the `oo-install-cfg.yml` file, the installer will present the question using Highline's [answer_or_default()](http://highline.rubyforge.org/doc/classes/HighLine/Question.html#M000030) method. All answers are validated according to the AnswerType setting. A few special AnswerTypes will trigger specific test behaviors as well:
 
-* AnswerType "loginhost" will expect a response of the form "username@<hostname or IP address>:<port (optional)>". When the answer is supplied, the system will attempt to SSH to the target system as the indicated user. If the SSH attempt requires a password, the user will be prompted to enter the password. Once connected, the Installer attempts to determine if the target system meets the [Target System Requirements](#target-system-requirements).
-* AnswerType "mongodbhost" performs similarly, except it attempts to connect to the target system's MongoDB instance.
-* AnswerType "role" causes the system to offer the [Simplified Deployment Roles](#simplified-deployment-roles) as options.
+* **_remotehost_** will expect a response of the form "username@<hostname or IP address>:<port (optional)>". When the answer is supplied, the system will attempt to SSH to the target system as the indicated user. If the SSH attempt requires a password, the user will be prompted to enter the password. Once connected, the Installer attempts to determine if the target system meets the [Target System Requirements](#target-system-requirements).
+* **_mongodbhost_** performs similarly, except it attempts to connect to the target system's MongoDB instance.
+* **_role_** causes the system to offer the [Simplified Deployment Roles](#simplified-deployment-roles) as options.
 
 ##### Executable
 In the "Executable" string, the keyword "`<workflow_path>`" will be automatically expanded to the full path of "`<gem_root>/workflows/<workflow_id>`". The answers to workflow questions can also be included using the notation "`<q:question_variable>`". For example, if one question had a Variable "openshift_role", its value could be used in the executable like this:
@@ -186,16 +182,16 @@ In the "Executable" string, the keyword "`<workflow_path>`" will be automaticall
 
 See ExecuteOnTarget for information on how paths are handled on a remote target system.
 
-##### ExecuteOnTarget
-When ExecuteOnTarget is "Y", the installer will implicitly copy the oo-install-cfg.yml file and any workflow-specific files to the remote host. They will be copied to the `$HOME/.openshift` directory and the `$HOME/.openshift/installer/<workflow_id>` directories respectively, and the installer will implicitly modify the Executable string accordingly.
+##### RemoteDeployment
+When RemoteDeployment is "Y", the installer will implicitly copy the oo-install-cfg.yml file and any workflow-specific files to the remote host. They will be copied to the `$HOME/.openshift` directory and the `$HOME/.openshift/installer/<workflow_id>` directories respectively, and the installer will implicitly modify the Executable string accordingly on the remote system.
+
+This flag also determines whether or not the [Deployment Check](#skipdeploymentcheck) will attempt to connect to target systems via SSH. A value of 'N' indicates that this Workflow is local only.
 
 ##### RequiredRPMS
 The RPMs listed here should only be the RPMs that must be installed before the Executable can even run (like Ruby or Puppet, for instance). Additional RPM checks, like for the presence of MongoDB on a system to be used for the DBServer [Role](#simplified-deployment-roles), should be checked by the Executable.
 
-<a id="installation-methodology"></a>
-
 #### Installation Methodology
-The specific installation methodology used by a given Workflow is entirely at the discretion of the Workflow's author. As long as the Workflow's "Executable" string results in the completion of the installation task using values from `oo-install-cfg.yml` (or exits with a non-zero error code in the event of a problem), the installer will function correctly. Some of the [Provided Workflows](#provided-workflows) will use [Puppet](http://puppetlabs.com/) and [hiera](http://docs.puppetlabs.com/hiera/1/puppet.html) to perform installations, but these tools only represent one method of extracting values from the config file and using them complete a Workflow.
+The specific installation methodology used by a given Workflow is entirely at the discretion of the Workflow's author. As long as the Workflow's "Executable" string results in the completion of the installation task using values from `oo-install-cfg.yml` (or exits with a non-zero error code in the event of a problem), the installer will function correctly. Three of the [Provided Workflows](#provided-workflows) will use [Puppet](http://puppetlabs.com/) and [hiera](http://docs.puppetlabs.com/hiera/1/puppet.html) to perform installations, but these tools only represent one method of extracting values from the config file and using them complete a Workflow.
 
 <a id="unattended-installations"></a>
 
@@ -221,9 +217,11 @@ To perform an unattended installation, the user invokes the installer with an ad
 ### Provided Workflows
 This section contains the workflows that will be provided with the initial release of the installer.
 
-<a id="multi-instance-deployment"></a>
+Two of the workflows defined here are specific the OpenShift Origin VM. However, the remote system installation is intended to develop into a general purpose remote deployment option that is usable for Origin or Enterprise on Fedora, RHEL or any other yum- and RPM-friendly host.
 
-#### Use an Origin VM in a Distributed Deployment
+<a id="workflow-use-an-origin-vm-in-a-distributed-deployment"></a>
+
+#### Workflow: Use an Origin VM in a Distributed Deployment
 The goal of this Workflow is to make it possible for a user to set up an entire distributed, multi-instance OpenShift system using multiple pre-built OpenShift VMs. By default each VM runs its own complete system, but this installation path turns off services and configures the remaining services to interact with other hosts. Whether the other hosts are Origin VMs or some other system instances is not important as long as they all meet the [Target System Requirements](#target-system-requirements).
 
     OpenShift Installer: Multi-Instance Deployment
@@ -239,15 +237,9 @@ The goal of this Workflow is to make it possible for a user to set up an entire 
 
 Once a user selects the role for this VM, the installer calls the Workflow Executable to configure the current Origin VM instance.
 
-- - -
+<a id="workflow-install-a-role-on-a-remote-system"></a>
 
-**NOTE**: This Workflow and two of the other three Workflows described here are interesting because they are only meaningful in the context of the Origin VM. The `workflows.yml` file that provides these workflows will only be distributed with the Origin VM; the standalone installer RPM will not include them.
-
-- - -
-
-<a id="remote-system-deployment"></a>
-
-#### Install a Role on a Remote System
+#### Workflow: Install a Role on a Remote System
 This Workflow causes the Installer to copy data over to a target host and then configure that host to act as one of the [Simplified Deployment Roles](#simplified-deployment-roles) as specified in the [Deployment section](#default-configuration) of the installer configuration.
 
     OpenShift Installer: Remote System Setup
@@ -265,8 +257,28 @@ Once a role is selected, the connection details are read from the Deployment set
 
 When the target host is identified, the installer will attempt to connect to the remote system via SSH. Because this Workflow starts with confirmation of the Deployment settings, the installer can assume at this point that the target host meets the [Target System Requirements](#target-system-requirements).
 
-#### Download Puppet Templates
-Origin VM only; this workflow exists simply to call attention to the various ways that users can gain access to the Puppet templates that are used by the installer.
+<a id="workflow-install-a-role-on-the-local-system"></a>
+
+#### Workflow: Install a Role on the Local System
+This Workflow is almost identical to the [remote system installation](#workflow-install-a-role-on-a-remote-system), however, it does not require SSH access to any other system. The user indicates the Role that the current system should assume, and the [Workflow Executable](#executable) performs the necessary work on the local system to establish it in the overall OpenShift system.
+
+    OpenShift Installer: Local System Setup
+    
+    Which role do you want to deploy?  
+    <1> Database server  
+    <2> Message queueing server  
+    <3> Broker  
+    <4> Node  
+    
+    <return> - Continue  
+    <esc> - Go to main menu  
+
+This Workflow is intended for networks where remote, SSH-based deployments from a single host are not possible. This scenario benefits from the portability of the `oo-install-cfg.yml` file; by copying this into each participating system, a user can bring up each piece of the OpenShift deployment without having to re-define the Role definitions on each host.
+
+<a id="workflow-download-puppet-templates"></a>
+
+#### Workflow: Download Puppet Templates
+This workflow exists simply to call attention to the various ways that users can gain access to the Puppet templates that are used by the installer. For OpenShift Origin, the output of this workflow may look like this:
 
     OpenShift Installer: Puppet Templates Download
     ----------------------------------------------
@@ -281,10 +293,10 @@ Origin VM only; this workflow exists simply to call attention to the various way
     
     <esc> - Go to main menu
 
-The only technical requirement is that the Origin VM packager will need to be instrumented to create and place the zip file referenced in the installer.
+The only technical requirement for Origin is that the VM packager will need to be instrumented to create and place the zip file referenced in the installer.
 
-#### Display VM Login Info
-This workflow simply displays the login information that the `oo-login` utility displayed by default.
+#### Workflow: Display VM Login Info
+_(Origin VM only)_ This workflow simply displays the login information that the `oo-login` utility displayed by default.
 
     OpenShift Origin VM Login Details
     ---------------------------------
@@ -301,13 +313,13 @@ This workflow simply displays the login information that the `oo-login` utility 
 
 
 ## Backwards Compatibility
-Most of the work that needs to be done will be done in the [puppet-openshift_origin](https://github.com/openshift/puppet-openshift_origin) repository, so from that perspective, impact on the rest of the Origin codebase will be limited. Any changes that have to be made to meet the requirements of the [roles-driven puppet scripts](#roles-driven-puppet-scripts) may affect any downstream puppet repos.
+This PEP describes functionality that was not previously available in OpenShift. From that perspective, backwards compatibility is not a factor in this design. However, anyone wishing to create a [Workflow](#installer-workflows) that leverages previously existing scripts will need to adjust them to read system configuration information from the installer's [configuration file](#recording-the-system-configuration) file.
 
 ## Rationale
 The follow sections explain design considerations that were necessary to define reasonable bounds for this PEP.
 
 ### Text-Based Installer
-The choice to use a text-based installer for this installer was two-fold. First off, per the [survey](https://www.openshift.com/blogs/survey-results-the-openshift-origin-unboxing-experience), the option of a more graphical installer was low in popularity. Second, a text-based installer lends itself to use with [unattended installations](#unattended-installations).
+The choice to use a text-based installer for this installer was two-fold. First off, per the [survey](https://www.openshift.com/blogs/survey-results-the-openshift-origin-unboxing-experience), the option of a more graphical installer was low in popularity. Second, being command-line invokable, the installer lends itself to use with [unattended installations](#unattended-installations).
 
 ### Workflows
 The Workflow concept enables this OpenShift installer to be easily reconfigured different deployment scenarios. By providing different `workflow.yml` files, oo-install RPMs can be customized to different distributions and environments.
@@ -320,6 +332,7 @@ In order to deliver a basic, functional deployment on one or more target hosts, 
 * Role: Broker
     * Broker RPM
     * MCollective
+    * BIND DNS Server
 * Role: Node
     * Node RPM
     * MCollective
@@ -334,10 +347,8 @@ This division of labor will not satisfy every deployment. The intent is to provi
 <a id="target-system-requirements"></a>
 
 ### Target System Requirements
-The installer does not create target systems from bare metal. The following expectations are tested by the installer for every target system.
+The following expectations are tested by the installer for every target system, with respect to relevant [workflow settings](#remotedeployment).
 
-1. The system is running and accessible via SSH with the specified user and ssh port. If the SSH session requires password authentication, the installer will ask for the password and pass it through to the SSH authentication but will not record it in the `oo-install-cfg.yml` file. See [Unattended Installations](#unattended-installations) for more comments on this.
-2. The SSH user is root, or has sudo access.
-3. The system has `yum` and can install packages from RPMs.
-
-Placing the starting point for the installer at this level greatly simplifies the system's initial requirements. Later iterations of the installer may re-introduce some greater level of bare-metal assembly.
+1. **For remote deployments only**, the target system must be running and accessible via SSH with the specified user and ssh port. If the SSH session requires password authentication, the installer will ask the user for the password and pass it through to the SSH authentication but will not record it in the `oo-install-cfg.yml` file. See [Unattended Installations](#unattended-installations) for more comments on this.
+2. The installing user is root, or has sudo access.
+3. The system has `yum` and can install packages from RPMs. The installer will perform tests to make this determination, leveraging the compatibility tool described in [this user story](https://trello.com/c/sYLNUE8d) when it becomes available.
