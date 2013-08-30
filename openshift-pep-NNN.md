@@ -116,8 +116,15 @@ The default configuration file for the OpenShift VM will look something like thi
           ssh_port: 22
           user: admin
           messaging_port: 61616
+    Workflows:
+      <Workflow ID 1>:
+        <Question ID 1>: Answer value 1
+        <Question ID 2>: Answer value 2
+      ...
+      <Workflow ID N>:
+        <Question ID N>: Answer value N
 
-The configuration file will always contain a Deployment section. This section is intended to store the complete OpenShift deployment in a way that can be used by any Workflow. When a user begins working with a given [Workflow](#installer-workflows), the answers to any Workflow-specific questions will be stored in a section that is keyed to the Workflow's ID.
+The configuration file will always contain a Deployment section. This section is intended to store the complete OpenShift deployment in a way that can be used by any Workflow. When a user begins working with a given [Workflow](#installer-workflows), the answers to any Workflow-specific questions will be stored in the Workflows section in a subgroup that is keyed to the Workflow's ID.
 
 - - -
 
@@ -149,8 +156,8 @@ The format for every workflow defined in `workflows.yml` is as follows:
       - File 3....
     SkipDeploymentCheck: Default is "N", specifies whether or not to ask the standard Deployment settings questions at the start of the workflow.
     Questions:
-      - Text: The text of the question to ask
-        Variable: The unique variable name to associate the response with
+      - ID: The unique variable name to associate the response with
+        Text: The text of the question to ask
         AnswerType: An answer type, see the section below for details.
       - Question 2...
       - Question 3...
