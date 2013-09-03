@@ -1,6 +1,6 @@
 PEP: 005  
 Title: Highly Available Web Applications  
-Status: draft  
+Status: accepted  
 Author: Rajat Chopra <rchopra@redhat.com>, Mrunal Patel <mpatel@redhat.com>, Mike McGrath <mmcgrath@redhat.com>, Clayton Coleman <ccoleman@redhat.com>  
 Arch Priority: high  
 Complexity: 40  

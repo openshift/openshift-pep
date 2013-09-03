@@ -1,6 +1,6 @@
 PEP: 004  
 Title: OpenShift Multi-Geo Support  
-Status: draft  
+Status: reviewed  
 Author: Mike McGrath <mmcgrath@redhat.com>  
 Arch Priority: High  
 Complexity: 30  

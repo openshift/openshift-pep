@@ -1,6 +1,6 @@
 PEP: 1  
 Title: Admin Console  
-Status: draft  
+Status: accepted  
 Author: Clayton Coleman <ccoleman@redhat.com>  
 Arch Priority: medium  
 Complexity: 40  
