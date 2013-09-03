@@ -8,13 +8,14 @@ WARNING: All content in this repository is public.  Do not create or submit PEPs
 Current
 -------
 
-* [Administrative Console](openshift-pep-001.md)
-* [V2 Cartridge Model](openshift-pep-002.md)
-* [Asynchronous management tasks](openshift-pep-003.md)
-* [Multi-Geography Support](openshift-pep-004.md)
-* [Highly Available Web Applications](openshift-pep-005.md)
-* [Zero-Downtime Deployment](openshift-pep-006.md)
-* [OpenStack Integration](openshift-pep-007.md)
+* [001: Administrative Console](openshift-pep-001.md)
+* [002: V2 Cartridge Model](openshift-pep-002.md)
+* [003: Asynchronous management tasks](openshift-pep-003.md)
+* [004: Multi-Geography Support](openshift-pep-004.md)
+* [005: Highly Available Web Applications](openshift-pep-005.md)
+* [006: Zero-Downtime Deployment](openshift-pep-006.md)
+* [007: OpenStack Integration](openshift-pep-007.md)
+* [008: Installer](openshift-pep-008.md)
 
 Process
 -------
