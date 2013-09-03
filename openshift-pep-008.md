@@ -1,12 +1,12 @@
-PEP: _TBD_  
+PEP: 008  
 Title: OpenShift Origin Installation Tool  
-Status: draft  
+Status: Approved  
 Author: N. Harrison Ripps <hripps@redhat.com>  
-Arch Priority: _TBD_  
+Arch Priority: High  
 Complexity: 40  
 Affected Components: admin_tools  
 Affected Teams: UI (1), Origin (1)  
-User Impact: high  
+User Impact: High  
 Epic: [Origin v3 Installation Wizard](https://trello.com/c/H01J2eo4/30-origin-v3-installation-wizard-design)
 
 ## Abstract
