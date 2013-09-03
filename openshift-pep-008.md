@@ -1,5 +1,5 @@
 PEP: 008  
-Title: OpenShift Origin Installation Tool  
+Title: OpenShift Installation Tool  
 Status: accepted  
 Author: N. Harrison Ripps <hripps@redhat.com>  
 Arch Priority: High  
