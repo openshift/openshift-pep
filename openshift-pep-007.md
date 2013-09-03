@@ -1,6 +1,6 @@
 PEP: 007  
 Title: OpenStack Integration  
-Status: draft  
+Status: reviewed  
 Author: Chris Alfonso <calfonso@redhat.com>, Luke Meyer <lmeyer@redhat.com>, Clayton Coleman <ccoleman@redhat.com>  
 Arch Priority: high  
 Complexity: 40  
