@@ -26,6 +26,7 @@ The goal of this PEP is to improve the operational experience of managing applic
   - First pass won't include modcluster for jboss
 * ability to roll back a deployment to a previous version
 * ability to push code now but build and deploy it later
+* ability to implement a custom build process by re-composing operations that make up the platform build process
 
 
 Specification
@@ -111,7 +112,6 @@ The following describes new ways to deploy a new version of code to an applicati
 * `rhc deploy -a myapp myartifact.tar.gz`
 
     Uploads a binary deployment artifact located on the user's computer to the application and makes it the active deployment.
-
 
 ### Deployment directory structure
 The following directory structure is proposed:
@@ -225,6 +225,7 @@ The following process will take place when `auto_deploy` is enabled, `keep_deplo
     1. Starting with the oldest deployment, previous deployments are removed until the number of deployments in `app-deployments` <= the value of `keep_deployments` (if necessary)
 
 ### Binary deployments
+
 Sometimes it doesn't make sense to use git to deploy an application. Git is not a particularly efficient means of deploying a pre-built Java .war file, for example.
 
 A binary deployment artifact could be one of the following formats:
@@ -284,6 +285,159 @@ The following process will take place when `auto_deploy` is disabled, `keep_depl
         1. SSH to the child gear and execute `gear activate $deployment_id --child`
     1. Write DEPLOYED to app-deployments/$date_$time/metadata/state
     1. Starting with the oldest deployment, previous deployments are removed until the number of deployments in `app-deployments` <= the value of `keep_deployments` (if necessary)
+
+### Node API
+
+This section describes the API for the following foundational actions:
+
+1. Build: create a deployment from the application's git-repo
+1. Prepare: prepare a deployment for distribution and activation
+1. Distribute: copy a deployment to web gears in an application
+1. Activate: Begin running a deployment on the web gears in an application
+
+Each workflow phase implements a contract:
+
+**Build**
+
+Inputs:
+
+1.  `deployment_request_id`: use a prior deployment instead of the current repo for the build
+
+Outputs:
+
+1.  Combined output of all actions as a String (TODO: refactor)
+
+Effects:
+
+1.  The `dependencies` and `build_dependencies` symlinks are updated to point to the `deployment_request_id`, if it is supplied.
+1.  `update-configuration`, `pre-build`, and `build` control actions are run on the primary cartridge
+
+Failure Modes:
+
+1.  If `deployment_request_id` is supplied and does not exist, raise an `ArgumentError`.
+1.  Restart the application as the gear user if a build failure occurs and `$OPENSHIFT_KEEP_DEPLOYMENTS` is greater than 1.
+
+**Prepare**
+
+Prepare a deployment artifact from a deployment request.
+
+Inputs:
+
+1.  `deployment_request_id`: datetime of the deployment to prepare
+1.  `file`: an archive file to use in place of a deployment
+
+Outputs:
+
+1.  Combined output of all actions as a String (TODO: refactor)
+
+Effects:
+
+1. A new deployment id is calculated from the deployment request
+1. A symlink is created in the by-id directory for the deployment id
+1. The deployment metadata for the id is updated to point to the new id
+
+Failure Modes:
+
+1. If `deployment_request_id` is not supplied, raise an ArgumentError
+1. If a fault occurs after a link is created in the by-id directory, it is unlinked.
+
+**Distribute**
+
+Copy a deployment to gears in the application.
+
+Inputs:
+
+1. `gears`: the gears to distribute to.  Optional; defaults to other web framework gears in the application.
+1. `deployment_id`: the ID of the deployment to distribute.
+
+Outputs:
+
+    {
+      status: :success # or :failure,
+      results: {
+        #{gear_uuid}: {
+          gear_uuid: #{gear_uuid},
+          status: :success, # or :failure
+          messages: [],
+          errors: []
+        }, …
+      }
+    }
+
+Failure Modes:
+
+1.  If no deployment ID is supplied, raise an `ArgumentError`.
+1.  If distribute to a gear fails, retry up to two times before considering that gear to have failed.
+1.  If distributing to any gear fails, the entire operation is a failure, but the platform will continue distributing to other gears in the application.
+
+**Activate**
+
+Run a deployment on gears in the application.
+
+Inputs:
+
+1.  `gears`: the gears on which to activate a deployment.  Optional; defaults to other web framework gears in the application.
+1.  `deployment_id`: the ID of the deployment to activate.
+1.  `init`: Run the web cartridge's `post-install` workflow after activating the deployment.  Optional; defaults to `false`.
+1.  `hot_deploy`: Do not disable the gear in the cluster during activation.  Controlled by the app's hot deployment setting; defaults to `false`.
+1.  `out`:
+
+Outputs:
+
+    {
+      status: :success # or :failure,
+      results: {
+        #{gear_uuid}: {
+          gear_uuid: #{gear_uuid},
+          status: :success, # or :failure
+          messages: [],
+          errors: []
+        }, …
+      }
+    }
+
+Failure modes:
+
+1.  If no deployment ID is supplied, raise an `ArgumentError`.
+1.  If any gear activation fails, the entire operation is a failure, but the platform will continue activating on other gears in the app.
+1.  If remote activation of a gear returns a non-zero exit code, generate a failure result for that gear.
+1.  If disabling a gear in any proxy fails, activation of that gear is a failure.  App is now potentially partially disabled across the cluster.
+1.  If enabling a gear in any proxy fails, activation of that gear is a failure.  App is not potentially partially disabled across the cluster.
+
+**Update Proxy Status**
+
+Change the status of a gear in the proxies for the app.
+
+Inputs:
+
+1.  `action`: action to perform (disable/enable)
+1.  `gear_uuid`: gear to change status for
+1.  `cartridge`: the web proxy cartridge
+1.  `persist`: store the status change in the proxy config file
+1.  `requesting_gear_uuid`: uuid of the gear requesting the status change
+
+Outputs:
+
+    {
+      status: :success, # or :failure
+      target_gear_uuid: #{gear_uuid}
+      proxy_results: {
+        #{proxy_gear_uuid}: {
+          proxy_gear_uuid: #{proxy_gear_uuid},
+          status: :success, # or :failure,
+          messages: [], # strings
+          errors: [] # strings
+        }, ...
+      }
+    }
+
+Failure Modes:
+
+1.  If no valid action is supplied, raise an `ArgumentError`.
+1.  If no gear uuid is supplied, raise an `ArgumentError`.
+1.  If no cartridge is supplied, and there is no web proxy cartridge, raise an `ArgumentError`.
+1.  If updating the status of the gear in any proxy fails, the operation is considered a failure, but the platform will continue updating the status of the gear in other proxies.
+
 
 ### Deployment rollback capability
 OpenShift must support an easy way to rollback from one deployment to the previous one. To do so, the previous deployment must be preserved.
