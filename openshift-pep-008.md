@@ -79,11 +79,10 @@ When invoked, the oo-install utility will look for a configuration file at `~/.o
 
 - - -
 
-**NOTE**: The installer will also keep a logfile at `~/.openshift/oo-install-cfg.log`. This will be overwritten every time the installer is invoked.
+**NOTE**:  
+The installer will also keep a logfile at `~/.openshift/oo-install-cfg.log`. This will be overwritten every time the installer is invoked.
 
 - - -
-
-<a id="default-configuration"></a>
 
 ##### Default Configuration
 The default configuration file for the OpenShift VM will look something like this:
@@ -116,6 +115,11 @@ The default configuration file for the OpenShift VM will look something like thi
           ssh_port: 22
           user: admin
           messaging_port: 61616
+    Subscription:
+      type: none
+
+The configuration file will always contain a Deployment section. This section is intended to store the complete OpenShift deployment in a way that can be used by any Workflow. The file will also start with a default Subscription section with type 'none' (more on this below, see [Subscriptions](#subscriptions). When a user begins working with a given Workflow, the answers to any Workflow-specific questions will be stored in the Workflows section in a subgroup that is keyed to [Installer Workflow](#installer-workflows) IDs.
+
     Workflows:
       <Workflow ID 1>:
         <Question ID 1>: Answer value 1
@@ -124,15 +128,12 @@ The default configuration file for the OpenShift VM will look something like thi
       <Workflow ID N>:
         <Question ID N>: Answer value N
 
-The configuration file will always contain a Deployment section. This section is intended to store the complete OpenShift deployment in a way that can be used by any Workflow. When a user begins working with a given [Workflow](#installer-workflows), the answers to any Workflow-specific questions will be stored in the Workflows section in a subgroup that is keyed to the Workflow's ID.
-
 - - -
 
-**Limitations**: For the first iteration of the installer, multiple hosts will only be supported for the Node role.
+**Limitations**:  
+For the first iteration of the installer, multiple hosts will only be supported for the Node role.
 
 - - -
-
-<a id="installer-workflows"></a>
 
 #### Installer Workflows
 Each installation option presented by the installer will come from a different `Installer::Workflow` object defined in the installer codebase. The function of each Workflow is to do the following:
@@ -163,6 +164,7 @@ The format for every workflow defined in `workflows.yml` is as follows:
       - Question 3...
     Executable: The full command to be executed to complete the Workflow.
     RemoteDeployment: "Y" or "N"; indicates whether the Executable is run locally or on the target system
+    SubscriptionCheck: "Y" or "N"; for installations on RHEL, indicates whether or not software subscription channels are required for the workflow.
     RequiredRPMS:
       - <RPM Name> (The name as used by the command "yum install <RPM Name>")
       - RPM 2
@@ -195,13 +197,14 @@ When RemoteDeployment is "Y", the installer will implicitly copy the oo-install-
 
 This flag also determines whether or not the [Deployment Check](#skipdeploymentcheck) will attempt to connect to target systems via SSH. A value of 'N' indicates that this Workflow is local only.
 
+##### SubscriptionCheck
+When set to "Y", the installer will ensure that the user has provided valid subscription information, either through the [configuration file](#default-configuration) file or through direct input. Read the section on Subscriptions for more information.
+
 ##### RequiredRPMS
 The RPMs listed here should only be the RPMs that must be installed before the Executable can even run (like Ruby or Puppet, for instance). Additional RPM checks, like for the presence of MongoDB on a system to be used for the DBServer [Role](#simplified-deployment-roles), should be checked by the Executable.
 
 #### Installation Methodology
 The specific installation methodology used by a given Workflow is entirely at the discretion of the Workflow's author. As long as the Workflow's "Executable" string results in the completion of the installation task using values from `oo-install-cfg.yml` (or exits with a non-zero error code in the event of a problem), the installer will function correctly. Three of the [Provided Workflows](#provided-workflows) will use [Puppet](http://puppetlabs.com/) and [hiera](http://docs.puppetlabs.com/hiera/1/puppet.html) to perform installations, but these tools only represent one method of extracting values from the config file and using them complete a Workflow.
-
-<a id="unattended-installations"></a>
 
 #### Unattended Installations
 The installer supports unattended installation for a given Workflow assuming the following requirements are met:
@@ -214,20 +217,10 @@ To perform an unattended installation, the user invokes the installer with an ad
 
     oo-install -w <workflow ID>
 
-- - -
-
-**The SSH password caveat**: The installer never records SSH passwords in the `oo-install-cfg.yml` file. However, each host entry in the [Deployment section](#default-configuration) of the config file supports the presence of a 'pass' key. When this key is present, the installer will attempt to start the SSH session using this as the password. In this manner, a user can manually edit their config file to add these values and enable unattended installation for these systems.
-
-- - -
-
-<a id="provided-workflows"></a>
-
 ### Provided Workflows
 This section contains the workflows that will be provided with the initial release of the installer.
 
 Two of the workflows defined here are specific the OpenShift Origin VM. However, the remote system installation is intended to develop into a general purpose remote deployment option that is usable for Origin or Enterprise on Fedora, RHEL or any other yum- and RPM-friendly host.
-
-<a id="workflow-use-an-origin-vm-in-a-distributed-deployment"></a>
 
 #### Workflow: Use an Origin VM in a Distributed Deployment
 The goal of this Workflow is to make it possible for a user to set up an entire distributed, multi-instance OpenShift system using multiple pre-built OpenShift VMs. By default each VM runs its own complete system, but this installation path turns off services and configures the remaining services to interact with other hosts. Whether the other hosts are Origin VMs or some other system instances is not important as long as they all meet the [Target System Requirements](#target-system-requirements).
@@ -244,8 +237,6 @@ The goal of this Workflow is to make it possible for a user to set up an entire 
     <esc> - Go to main menu
 
 Once a user selects the role for this VM, the installer calls the Workflow Executable to configure the current Origin VM instance.
-
-<a id="workflow-install-a-role-on-a-remote-system"></a>
 
 #### Workflow: Install a Role on a Remote System
 This Workflow causes the Installer to copy data over to a target host and then configure that host to act as one of the [Simplified Deployment Roles](#simplified-deployment-roles) as specified in the [Deployment section](#default-configuration) of the installer configuration.
@@ -265,8 +256,6 @@ Once a role is selected, the connection details are read from the Deployment set
 
 When the target host is identified, the installer will attempt to connect to the remote system via SSH. Because this Workflow starts with confirmation of the Deployment settings, the installer can assume at this point that the target host meets the [Target System Requirements](#target-system-requirements).
 
-<a id="workflow-install-a-role-on-the-local-system"></a>
-
 #### Workflow: Install a Role on the Local System
 This Workflow is almost identical to the [remote system installation](#workflow-install-a-role-on-a-remote-system), however, it does not require SSH access to any other system. The user indicates the Role that the current system should assume, and the [Workflow Executable](#executable) performs the necessary work on the local system to establish it in the overall OpenShift system.
 
@@ -282,8 +271,6 @@ This Workflow is almost identical to the [remote system installation](#workflow-
     <esc> - Go to main menu  
 
 This Workflow is intended for networks where remote, SSH-based deployments from a single host are not possible. This scenario benefits from the portability of the `oo-install-cfg.yml` file; by copying this into each participating system, a user can bring up each piece of the OpenShift deployment without having to re-define the Role definitions on each host.
-
-<a id="workflow-download-puppet-templates"></a>
 
 #### Workflow: Download Puppet Templates
 This workflow exists simply to call attention to the various ways that users can gain access to the Puppet templates that are used by the installer. For OpenShift Origin, the output of this workflow may look like this:
@@ -319,6 +306,70 @@ _(Origin VM only)_ This workflow simply displays the login information that the 
     SSH user:   openshift
     Password:   openshift
 
+### Subscriptions
+On Fedora-based systems, Installation Workflows can focus on using `yum` as their primary source for software package downloads. However, the situation is more complex on RHEL. Enterprise systems may still be configured to use `yum` directly, but there are other ways of establishing software channels that Installation Workflows must be aware of.
+
+When a [Workflow configuration](#installer-workflows) indicates that a subscription check should be performed, this cues the installer to ask questions that will help to establish one of the four possible software channel sources:
+
+* none - The Workflow can assume that all necessary packages are already available on the target system.
+* yum - The Workflow will use `yum` to install packages, and will create new repo files under `/etc/yum.repos.d/` if necessary.
+* rhn - The Workflow will use Red Hat Network to add necessary software channels.
+* rhsm - The Workflow will use Red Hat Subscription Manager to add necessary software channels.
+
+#### Getting and Storing Subscription Information
+The "none" and "yum" subscription methods do not require the installer to store particularly sensitive data. However, connecting to RHN or the Red Hat Subscription manager will require the user to provide a username and password. The installer will provide the user with a few different ways of handling this. However, it is first important to understand the difference between _temporary_ and _configured_ subscription settings.
+
+#### Temporary and Configured Subscription Settings
+Storing subscription info in the `oo-install` [configuration file](#default-configuration) is convenient but inherently insecure. Taking subscription info at runtime is more secure, but limits the feasibility of unattended deployments. The approach taken by the installer will be to support _both_.
+
+Supporting both methods means that the installer will offer to store subscription information, but will also accept values at runtime that will *replace* the configured values. The values supplied at runtime can either be provided as arguments to the `oo-install` command, or can be provided during the course of Workflow configuration.
+
+#### Command-Line Options
+The installer will support three command-line options relevant to subscription info:
+
+* `-s --subscription-type [TYPE]` - 'none', 'yum', 'rhn' or 'rhsm'
+* `-u --username USERNAME` - Red Hat Login username
+* `-p --password PASSWORD` - Red Hat Login password
+
+On the subject of [unattended installations](#unattended-installations): Other than the 'none' subscription type, each type will require additional information to work correctly. However, because this information is not as sensitive, it should be added to the installer configuration file.
+
+#### Runtime Evaluation
+When the user is manually stepping through a Workflow, the Subscription information is compiled and evaluated in this order:
+
+1. Configuration file
+2. Command line
+3. User modifications at runtime
+
+In other words, at runtime, config file subscription info can be superseded by command line arguments, and the user can trump both while configuring the selected Workflow.
+
+Additionally, the installer will give the user the opportunity to save their runtime configurations back to the config file, _or to only use them for this run of the installer_. This behavior supports the need for security in some deployments.
+
+When the installer is running unattended, the evaluation order is almost the same, but there is no opportunity for runtime modifications:
+
+1. Configuration file
+2. Command line
+
+This does not guarantee that a given Workflow can run unattended; it is the Workflow's "responsibility" to provide questions for capturing and storing other necessary info for unattended operation.
+
+#### Passing Subscription Settings to Workflow Executables
+The runtime subscription settings can include a mixture of information that isn't necessarily stored in the installer configuration file. For this reason, a workflow executable can't inspect the 'Subscription' section of the installer configuration file (if the section is even there) to get at the data that it needs.
+
+For this reason, subscription information is passed to the workflow executable as a set of environment variables. All environment variables set by the installer are prefixed with 'OO_INSTALL_' so they can be grepped out of the complete environment.
+
+The installer will pass the following environment variables:
+
+* OO_INSTALL_SUBSCRIPTION_TYPE - 'none', 'yum', 'rhn', or 'rhsm'
+* OO_INSTALL_RH_USERNAME - Red Hat Login username for 'rhn' and 'rhsm' subscriptions
+* OO_INSTALL_RH_PASSWORD - Red Hat Login password for 'rhn' and 'rhsm' subscriptions
+* OO_INSTALL_REPOS_BASE - For 'yum'; the base URL for the OpenShift repositories
+* OO_INSTALL_RHEL_REPO - For 'yum'; the URL for a RHEL repository
+* OO_INSTALL_JBOSS_REPO_BASE - For 'yum'; the base URL for a JBoss repository
+* OO_INSTALL_RHEL_OPTIONAL_REPO - For 'yum'; the URL for an unsupported RHEL "optional" repo
+* OO_INSTALL_SM_REG_POOL - For 'rhsm'; pool ID for OpenShift subscription
+* OO_INSTALL_SM_REG_POOL_RHEL - For 'rhsm'; pool ID for RHEL subscription
+* OO_INSTALL_RHN_REG_ACTKEY - For 'rhn'; channel activation key
+
+In practice, not all environment variables may be necessary for the Workflow. That is up to the workflow to decide. The installer passes along all of these values that have been set at runtime.
 
 ## Backwards Compatibility
 This PEP describes functionality that was not previously available in OpenShift. From that perspective, backwards compatibility is not a factor in this design. However, anyone wishing to create a [Workflow](#installer-workflows) that leverages previously existing scripts will need to adjust them to read system configuration information from the installer's [configuration file](#recording-the-system-configuration) file.
@@ -331,8 +382,6 @@ The choice to use a text-based installer for this installer was two-fold. First 
 
 ### Workflows
 The Workflow concept enables this OpenShift installer to be easily reconfigured different deployment scenarios. By providing different `workflow.yml` files, oo-install RPMs can be customized to different distributions and environments.
-
-<a id="simplified-deployment-roles"></a>
 
 ### Simplified Deployment Roles
 In order to deliver a basic, functional deployment on one or more target hosts, the Workflows that initially ship with the installer will split all of the components of OpenShift into four basic roles, using the specific software as indicated:
@@ -351,8 +400,6 @@ In order to deliver a basic, functional deployment on one or more target hosts, 
     * MongoDB
 
 This division of labor will not satisfy every deployment. The intent is to provide the administrator with a working OpenShift system that can be incrementally adjusted to suit the specific needs of a given environment.
-
-<a id="target-system-requirements"></a>
 
 ### Target System Requirements
 The following expectations are tested by the installer for every target system, with respect to relevant [workflow settings](#remotedeployment).
