@@ -206,7 +206,7 @@ The following process will take place when `auto_deploy` is enabled, `keep_deplo
     1. The user's `build` hook is invoked, if it exists
 1. The platform's `prepare` command is invoked
     1. The user's `prepare` hook is invoked, if it exists
-    1. The deployment id is calculated from the contents of the deployment directory
+    1. The deployment id and checksum of deployment contents are calculated
     1. The symlink `app-deployments/by-id/$deployment_id` is created and points to `../app-deployments/$date_time`
 1. The platform's `distribute` command is invoked
     1. If the app is scalable, the new deployment will be synced to all child gears
@@ -267,7 +267,7 @@ The following process will take place when `auto_deploy` is disabled, `keep_depl
 1. The platform's `prepare` command is invoked
     1. The file specified by <url> is downloaded and extracted to `app-deployments/$date_$time`
     1. The user's `prepare` hook is invoked, if it exists
-    1. The deployment id is calculated from the contents of the deployment directory
+    1. The deployment id and checksum of deployment contents are calculated
     1. The symlink `app-deployments/by-id/$deployment_id` is created and points to `../app-deployments/$date_time`
 1. The platform's `distribute` command is invoked
     1. If the app is scalable, the new deployment will be synced to all child gears
