@@ -196,7 +196,8 @@ The following process will take place when `auto_deploy` is enabled, `keep_deplo
 1. Application is stopped
 1. The cartridge's `pre-repo-archive` command is invoked
 1. A new deployment directory `app-deployments/$date_$time` is created with `repo` and `dependencies` subdirectories
-1. All dependencies from the active deployment (app-root/runtime/dependencies) are copied to `app-deployments/$date_$time/dependencies`
+1. All dependencies from the active deployment (app-root/runtime/dependencies) are copied (or moved if keep_deployments == 1) to `app-deployments/$date_$time/dependencies`
+1. Starting with the oldest deployment, previous deployments are removed until the number of deployments in app-deployments <= the value of keep_deployments (if necessary)
 1. The contents of the git repo for the current deployment branch are unpacked into `app-deployments/$date_$time/repo`
 1. A build is performed
     1. The cartridge's `pre_build` command is invoked
@@ -219,10 +220,8 @@ The following process will take place when `auto_deploy` is enabled, `keep_deplo
     1. The primary cartridge is started
     1. The primary cartridge's `post_deploy` control action is invoked
     1. The user's `post_deploy` hook is invoked, if it exists
-    1. If the app is scalable and the options did not include --child, for each child gear:
-        1. SSH to the child gear and execute `gear activate $deployment_id --child`
-    1. Write DEPLOYED to app-deployments/$date_$time/metadata/state
-    1. Starting with the oldest deployment, previous deployments are removed until the number of deployments in `app-deployments` <= the value of `keep_deployments` (if necessary)
+    1. If the app is scalable, SSH to each child gear and execute gear activate $deployment_id
+    1. Write activation time to app-deployments/$date_$time/metadata.json
 
 ### Binary deployments
 
@@ -264,6 +263,7 @@ The following process will take place when `auto_deploy` is disabled, `keep_depl
 
 1. User invokes `rhc deploy -a myapp <url>`
 1. A new deployment directory `app-deployments/$date_$time` is created with `repo` and `dependencies` subdirectories
+1. Starting with the oldest deployment, previous deployments are removed until the number of deployments in `app-deployments` <= the value of `keep_deployments` (if necessary)
 1. The platform's `prepare` command is invoked
     1. The file specified by <url> is downloaded and extracted to `app-deployments/$date_$time`
     1. The user's `prepare` hook is invoked, if it exists
@@ -281,10 +281,8 @@ The following process will take place when `auto_deploy` is disabled, `keep_depl
     1. The primary cartridge is started
     1. The primary cartridge's `post_deploy` control action is invoked
     1. The user's `post_deploy` hook is invoked, if it exists
-    1. If the app is scalable and the options did not include --child, for each child gear:
-        1. SSH to the child gear and execute `gear activate $deployment_id --child`
-    1. Write DEPLOYED to app-deployments/$date_$time/metadata/state
-    1. Starting with the oldest deployment, previous deployments are removed until the number of deployments in `app-deployments` <= the value of `keep_deployments` (if necessary)
+    1. If the app is scalable, SSH to each child gear and execute gear activate $deployment_id
+    1. Write activate time to app-deployments/$date_$time/metadata.json
 
 ### Node API
 
