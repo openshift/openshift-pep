@@ -149,12 +149,10 @@ The Workflows will be instantiated from a config file located at `<gem_root>/con
 The format for every workflow defined in `workflows.yml` is as follows:
 
     Name: The name of the workflow
+    Type: A single value or list of workflow types
     Description: The text displayed by the installer in the workflow list
-    ID: A distinct alphanumeric ID for the workflow, used in oo-install-cfg.yml and <gem_root>/workflows/<workflow_id> for namespacing
-    RemoteFiles:
-      - URL for file (including git:// URL)
-      - File 2...
-      - File 3....
+    ID: A distinct alphanumeric ID for the workflow, used in oo-install-cfg.yml
+    WorkflowDir: Defaults to <gem_root>/workflows/<workflow_id>, but can be overriden to <gem_root>/workflows/<workflow_dir>
     SkipDeploymentCheck: Default is "N", specifies whether or not to ask the standard Deployment settings questions at the start of the workflow.
     Questions:
       - ID: The unique variable name to associate the response with
@@ -164,15 +162,17 @@ The format for every workflow defined in `workflows.yml` is as follows:
       - Question 3...
     Executable: The full command to be executed to complete the Workflow.
     RemoteDeployment: "Y" or "N"; indicates whether the Executable is run locally or on the target system
-    SubscriptionCheck: "Y" or "N"; for installations on RHEL, indicates whether or not software subscription channels are required for the workflow.
-    RequiredRPMS:
-      - <RPM Name> (The name as used by the command "yum install <RPM Name>")
-      - RPM 2
-      - RPM 3
+    SubscriptionCheck: "Y" or "N"; indicates whether the workflow will utilize any of yum, Red Hat Network, or Red Hat Subscription Manager to acquire necessary packages
+    NonDeployment: "Y" or "N"; used for information workflows that do not actually perform installations
+    RequiredUtilities:
+      - The command name of a utility (like 'puppet' or 'unzip') that should be checked for on the target host
+      - Utility 2
+      - Utility 3
 
+##### Type
+The installer will support three installation types: 'origin', 'origin_vm', and 'ose'. This determines which contexts this workflow will be listed with. For example, if a workflow's type is 'ose', then it will only appear in the menu of installation options when oo-install is invoked with the '-e' flag (for OpenShift Enterprise).
 
-##### RemoteFiles
-Files that only live locally in `<gem_root>/workflows/<workflow_id>` do not need to be listed here. Listed remote files are retrieved every time the installer is run even if they are already present in `<gem_root>/workflows/<workflow_id>`.
+Type can either be a single value or a reference to a list of values to indicate which contexts will include this workflow.
 
 ##### SkipDeploymentCheck
 By default, before the Workflow's questions are asked, the Installer always asks the user if they want to review and modify the settings from the [Deployment section](#default-configuration) of the configuration file. If the user wants to review the settings, they will see a series of screens that list the current info and give the user the opportunity to change that info. This is a valuable first step for most Workflows. However, for Workflows that only provide information to the user without doing any installation work, this flag can be set to skip the Deployment questions altogether.
@@ -180,8 +180,6 @@ By default, before the Workflow's questions are asked, the Installer always asks
 ##### Questions
 After asking the user to verify the Deployment, the installer starts iterating through the Workflow questions. When an answer already exists in the `oo-install-cfg.yml` file, the installer will present the question using Highline's [answer_or_default()](http://highline.rubyforge.org/doc/classes/HighLine/Question.html#M000030) method. All answers are validated according to the AnswerType setting. A few special AnswerTypes will trigger specific test behaviors as well:
 
-* **_remotehost_** will expect a response of the form "username@<hostname or IP address>:<port (optional)>". When the answer is supplied, the system will attempt to SSH to the target system as the indicated user. If the SSH attempt requires a password, the user will be prompted to enter the password. Once connected, the Installer attempts to determine if the target system meets the [Target System Requirements](#target-system-requirements).
-* **_mongodbhost_** performs similarly, except it attempts to connect to the target system's MongoDB instance.
 * **_role_** causes the system to offer the [Simplified Deployment Roles](#simplified-deployment-roles) as options.
 * **_rolehost_** - This question must follow the **_role_** question; it presents a list of the hosts for the indicated role in the `oo-install-cfg.yml` file or automatically selects the host if only one is defined for that role.
 
@@ -200,8 +198,8 @@ This flag also determines whether or not the [Deployment Check](#skipdeploymentc
 ##### SubscriptionCheck
 When set to "Y", the installer will ensure that the user has provided valid subscription information, either through the [configuration file](#default-configuration) file or through direct input. Read the section on Subscriptions for more information.
 
-##### RequiredRPMS
-The RPMs listed here should only be the RPMs that must be installed before the Executable can even run (like Ruby or Puppet, for instance). Additional RPM checks, like for the presence of MongoDB on a system to be used for the DBServer [Role](#simplified-deployment-roles), should be checked by the Executable.
+##### NonDeployment
+When set to "Y", this overrides and forces SkipDeploymentCheck to "Y" and RemoteDeployment and SubscriptionCheck to "N". The purpose of a non-deployment workflow is strictly informational; the indicated executable is run and then the workflow is complete. This is useful for running bash scripts that summarize information about the local system or the installer configuration.
 
 #### Installation Methodology
 The specific installation methodology used by a given Workflow is entirely at the discretion of the Workflow's author. As long as the Workflow's "Executable" string results in the completion of the installation task using values from `oo-install-cfg.yml` (or exits with a non-zero error code in the event of a problem), the installer will function correctly. Three of the [Provided Workflows](#provided-workflows) will use [Puppet](http://puppetlabs.com/) and [hiera](http://docs.puppetlabs.com/hiera/1/puppet.html) to perform installations, but these tools only represent one method of extracting values from the config file and using them complete a Workflow.
