@@ -93,28 +93,21 @@ The default configuration file for the OpenShift VM will look something like thi
     Description: This is the configuration file for the OpenShift Installer.
     Version: 0.0.1
     Deployment:
-      Brokers:
-        - host: localhost
-          port: 443
-          ssh_port: 22
-          user: admin
-          messaging_port: 61616
-      MQServers:
-        - host: localhost
-          ssh_port: 22
-          user: admin
-          messaging_port: 61616
-      DBServers:
-        - host: localhost
-          ssh_port: 22
-          port: 27017
-          user: admin
-          db_user: admin
-      Nodes:
-        - host: localhost
-          ssh_port: 22
-          user: admin
-          messaging_port: 61616
+      Hosts:
+        - host: broker.mydomain.com
+          roles:
+          - broker
+          - mqserver
+          - dbserver
+          ssh_host: broker
+          user: root
+        - host: node1.mydomain.com
+          roles:
+          - node
+          ssh_host: node1
+          user: root
+      DNS:
+        app_domain: example.com
     Subscription:
       type: none
 
