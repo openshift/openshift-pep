@@ -75,6 +75,13 @@ OpenShift.
 
 #### Log aggregation service cartridge:
 
+1. Must support aggregating logs to disk as well at provide a drain.  This
+drain should be suitable for future cartridges that provide advanced log
+indexing.
+
+  A desireable feature of this log aggregation service cartridge is that it's
+configuration be editable by the gear owner to allow for maximum flexibility.
+
 1. Must not require more than 1 extra gear per domain for normal usage
 
   This may require expose_port to be called for domain scoped applications.
@@ -121,10 +128,12 @@ required to log following strict guidelines and by doing so benefit from the
 service.
 
 A common concept for these providers is the log drain.  If logs are not drained
-they are simply discarded.  The drain for the first iteration of the OpenShift
-log aggregation service will be the filesytem.  One benefit will be that the
-only logs that stand the chance of being discarded are old logs.  New logs will
-always be stored.
+they are simply discarded.  The drains for the first iteration of the OpenShift
+log aggregation service will be the filesytem as well as something like
+websocket that make for easy integration with a log indexing service.  By
+having the logs also persisted to disk and rotation the the only logs that
+stand the chance of being discarded are old logs.  New logs will always be
+stored.
 
 Later iterations may provide other drains.  Implementing this service and
 plugin as cartridges allows not only for rapid prototyping but removes many
