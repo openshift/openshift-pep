@@ -125,6 +125,7 @@ CMD        |-|Execute|The default executable or arguments that will be run when 
 VOLUME     |-| |A volume or directory that will be externally mounted into the running container.  Not supported in V2.
 USER       |*default* gear user| |The Unix user the container processes will start under
 WORKDIR    |*default* gear directory| |The working directory for the ENTRYPOINT
+           | |Prepare|A path to a script (or an embedded script) that will be executed when a cartridge is **prepared**. 
 
 
 
