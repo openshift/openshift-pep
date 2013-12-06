@@ -16,6 +16,7 @@ Leverage Docker in OpenShift to deliver a more flexible and powerful distributio
 
 We would alter the build/deployment/cartridge model to focus more on image deployment - source code changes are combined with a cartridge (build/deployment/execution environment) to create a docker image that can be easily scaled up or rolled back to.  Users would be able to install their own packages and run their gear images on their local laptops.  In addition, we would enable easier distribution and execution mechanisms for cartridges that build on our existing system.  We would enable more controlled upgrades, deployments, and version to version changes.
 
+This PEP depends on and modifies [PEP 002: Cartridges V2](https://github.com/openshift/openshift-pep/blob/master/openshift-pep-002-cartridge-v2.md).
 
 Background
 ----------
@@ -110,6 +111,21 @@ This also enables the concept of compatible cartridges upgrades - for example fr
 ### Changes to manifest.yml
 
 A v3 manifest would look similar to a v2 manifest, with the addition of a "run" collection (list of commands to run).  A v3 manifest is a strict superset of a dockerfile.
+
+Dockerfile|v2|v3|Description
+----------|--|--|-----------
+FROM      |*default* RHEL 6.5 OpenShift Node environment| |The base image this cartridge depends on
+MAINTAINER|-|Author|The author of this cartridge
+RUN       |*default* bin/install and bin/setup|Run|The series of steps used to initialize this cartridge on disk
+EXPOSE    |Endpoints|Endpoints|The internal ports and their metadata this cartridge exposes. Both V2 and V3 expose additional options as well as the protocol type.
+ENV       |*default* created during bin/setup| |An environment key and value this image starts with
+ADD       |SourceUrl| |A set of source files and destinations to copy into the container - Docker provides this at image creation time, OpenShift V2 allowed only an external URL that was downloaded into the root working directory
+ENTRYPOINT|*default* bin/control start|Execute|An executable that will be run when the container starts.
+CMD       |-|Execute|The default executable or arguments that will be run when the container starts. OpenShift V3 requires an executable, so a Dockerfile without CMD or ENTRYPOINT cannot be used as a cartridge.
+VOLUME    |-| |A volume or directory that will be externally mounted into the running container.  Not supported in V2.
+USER      |*default* gear user| |The Unix user the container processes will start under
+WORKDIR   |*default* gear directory| |The working directory for the ENTRYPOINT
+
 
 
 ### Preparation
