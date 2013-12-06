@@ -5,17 +5,6 @@ Project Enhancement Proposals track technical changes to the OpenShift product. 
 
 WARNING: All content in this repository is public.  Do not create or submit PEPs that are sensitive in nature or confidential
 
-Current
--------
-
-* [001: Administrative Console](openshift-pep-001.md)
-* [002: V2 Cartridge Model](openshift-pep-002.md)
-* [003: Asynchronous management tasks](openshift-pep-003.md)
-* [004: Multi-Geography Support](openshift-pep-004.md)
-* [005: Highly Available Web Applications](openshift-pep-005.md)
-* [006: Zero-Downtime Deployment](openshift-pep-006.md)
-* [007: OpenStack Integration](openshift-pep-007.md)
-* [008: Installer](openshift-pep-008.md)
 
 Process
 -------
