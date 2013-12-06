@@ -1,13 +1,13 @@
-PEP: *number assigned by the arch board*  
-Title: Log rotation and aggregation    
-Status: draft 
-Author: Brenton Leanhardt <bleanhar@redhat.com>   
-Arch Priority: medium   
-Complexity: 20   
-Affected Components: runtime, cartridges     
-Affected Teams: Runtime (0-5), UI (0-5), Broker (0-5), Enterprise (0-5)     
-User Impact: medium   
-Epic: *url to a story, wiki page, or doc*   
+PEP: 009  
+Title: Log rotation and aggregation  
+Status: draft  
+Author: Brenton Leanhardt <bleanhar@redhat.com>  
+Arch Priority: medium  
+Complexity: 20  
+Affected Components: runtime, cartridges   
+Affected Teams: Runtime (0-5), UI (0-5), Broker (0-5), Enterprise (0-5)  
+User Impact: medium  
+Epic: *url to a story, wiki page, or doc*  
 
 Abstract
 --------
