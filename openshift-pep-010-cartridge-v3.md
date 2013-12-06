@@ -1,0 +1,237 @@
+PEP: 010  
+Title: Cartridge V3 and Docker Containers  
+Status: draft  
+Author: Clayton Coleman <ccoleman@redhat.com>  
+Arch Priority: high  
+Complexity: 200  
+Affected Components: web, api, runtime, cartridges, broker, admin_tools, cli  
+Affected Teams: Runtime, UI), Broker, Enterprise  
+User Impact: high  
+Epic: 
+
+Abstract
+--------
+
+Leverage Docker in OpenShift to deliver a more flexible and powerful distribution model for full application stacks.  Each Docker image is like a full Operating System snapshot, but each image can be composed of multiple layers (a set of commands and files that describe how to build on top of each layer).  Users can easily create Docker layers and images and distribute them for execution in other environments, even other Linux versions.  This PEP describes how the OpenShift cartridge and gear format can evolve to leverage the full capabilities of Docker.
+
+We would alter the build/deployment/cartridge model to focus more on image deployment - source code changes are combined with a cartridge (build/deployment/execution environment) to create a docker image that can be easily scaled up or rolled back to.  Users would be able to install their own packages and run their gear images on their local laptops.  In addition, we would enable easier distribution and execution mechanisms for cartridges that build on our existing system.  We would enable more controlled upgrades, deployments, and version to version changes.
+
+
+Background
+----------
+
+We hope to leverage the full capabilities of the Docker container, while working with the OpenStack Solum project to evolve a new public standard that benefits developers and operators in the public cloud.  We should take into account the limitations of the current mutable gear model and look for opportunities to isolate components further (gears don't change, source code split out into its own locations, routing moves out of gears and nodes).
+
+A key design goal is to reduce the changes that occur inside of a gear after it is created - in theory, reduce the changes to solely user application state, vs cartridge or gear state.
+
+
+Specification
+-------------
+
+An OpenShift application is composed of 1..N gears.  Each gear represents an execution environment for 1 primary cartridge and 0..N secondary cartridges (also called plugins).  Each gear maps to one "container", which is a unix user, a SELinux category label, a home directory, and a set of exposed ports.
+
+A v3 gear should be a Docker container - which means that it is stopped and started via the Docker control API, initialized with environment via the Docker run command, and expected to use the same code from server to server.  The gear would be provided with mounted directories for mutable data.  In order to guarantee that a gear would continue to function in isolation, the **gear image** would be the result of combining the primary cartridge with the application source code (and any build results).  This allows the gear image to be started on multiple servers as the result of a scale up, without any communication required between gears.  Any change to a gear occurs on a build, which means that a single process is responsible for user code changes, security updates, and cartridge version changes.
+
+An OpenShift cartridge is metadata that describes the capabilities of a set of software - likewise, a Dockerfile is metadata describing how to prepare a set of software for use in an image.  In OpenShift, we would treat the base Dockerfile elements - BASE, RUN, and EXECUTE - as new additions to the cartridge manifest, and we would map the remaining metadata to existing OpenShift elements.
+
+A v3 cartridge is a Docker image, with a set of metadata (a manifest) that can be translated to a Dockerfile for execution during a build.  The v3 manifest adds additional elements to handle the execution of steps and a RUN command.  v2 cartridges will have default values for these (bin/setup and bin/control start).  The act of transforming a cartridge image with cartridge hooks and/or source and build will be known as the **prepare** step ("preparing a cartridge"), and result in a **deployment artifact** which is a Docker image.
+
+
+### What's in a deployment artifact (Docker layers)?
+
+                                            +--------------+
+                                            | Symlinks     |
+                                            | Built WAR    |  Deployment Layer
+                                            | User Source  |
+                        +--------------+    +--------------+
+                        | Scripts      |    | Scripts      |
+                        | JBoss        |    | JBoss        |
+                        | Maven        |    | Maven        |  Cartridge Layer
+                        | OpenJDK      |    | OpenJDK      |
+    +--------------+    +--------------+    +--------------+
+    | Libc / Bash  |    | Libc / Bash  |    | Libc / Bash  |  Base Layer
+    +--------------+    +--------------+    +--------------+
+
+    +--------------+    +--------------+    +--------------+
+    | Kernel       |    | Kernel       |    | Kernel       |
+    +--------------+    +--------------+    +--------------+
+
+    1. Base from CDN    2. Cartridge        3. Deployment
+                                               Artifact
+
+
+### Creating a deployment artifact (a gear image) flow
+
+         +--------------+    +------------+
+         | User Git     | OR | Binary     |
+         | repo tarball |    | (WAR, zip) |
+         +------+-------+    +------+-----+
+                |                   |
+                +---------------+   |           +--------------+
+                                |   |           | Symlinks     |
+                                |   |           | Built WAR    |
+                                |   |           | User Source  |
+    +--------------+            |   |           +--------------+
+    | Scripts      |            |   |           | Scripts      |
+    | JBoss        |            v   v           | JBoss        |
+    | Maven        +------> invoke prepare +--->| Maven        +---> save as new
+    | OpenJDK      |        script              | OpenJDK      |     image in Docker
+    +--------------+                            +--------------+
+    | Libc / Bash  |                            | Libc / Bash  |
+    +--------------+                            +--------------+
+
+    Cartridge Image                             Deployment Artifact
+
+
+The broker will manage which deployed artifact (DA) a gear is using, and instruct the nodes to scale up, scale down, or "replace" the running version of a gear.  We would no longer make changes inside a gear as a result of user operations.
+
+Plugin cartridges are TBD, but they may be injected during the prepare step or bind mounted into the gear after launch.
+
+In order to deliver security updates to cartridges, the operator must be able to regenerate docker images and then trigger builds in affected gears.  This is a long running operation and may also involve skipping failed builds and notifying affected users.
+
+Docker images live in a registry backed by some persistent storage.  OpenShift would run at least 2 registries - one for public images, and one for private images.  Public images would be where shared cartridges come from, but private images would be isolated per account (domain?) and not visible to others. The metadata describing cartridges would move to the broker, and be mediated via a set of APIs for administrators and users. Over time, OpenShift might expose access to the registries to external users so they can download and run gears locally.
+
+OpenShift should support V2 cartridges and V3 cartridges side by side.  Because of the scope of such a change, it is preferable to allow code paths to be application based - new applications might be created with a -v3 flag that marks the application, and those gears might run on nodes that were a different version of our code (or heavily branched).  The alternative is to do a very complex and potentially one way migration that removes features, with no easy way to abort that change. 
+
+In order to advance both high availability and the evolution of the platform, moving HAProxy out of the gears and into its own set of containers / layer would be ideal.  Further investigation is needed, but a number of open source projects have advanced sufficiently to where full HA routing is now possible without a deep investment.  In either case, the Routing SPI abstraction would allow us to choose how and when to move this functionality out of the main gears.
+
+
+### Write-once Gears
+
+There are a number of advantages to making our gears and cartridges write-once - i.e., doing cartridge installs, gear setup, and source builds together, and then reusing the result of that change over and over.  Since the runtime for the cartridge is bundled with user code, users can easily revert to a previous version in the event of an update.  Security updates and builds cannot break running gears - they can only cause a new build to fail and there is always a rollback if the new code doesn't work.  This has the potential to make security updates and gear migrations much easier to control - pushing new cartridge versions can be done without causing users to immediately break.
+
+If gears are write-once, it would be better to force the choice of having state in those gears to be explicit.  A large part of gear state today is the Git repository.  Moving the Git repository into its own container (but still distributed on nodes) would allow us to add additional semantics to those repositories while reusing existing concepts like SSH and cgroup limits.  OpenShift would invoke a plugin to create the repository gear on the appropriate node, and add a special API call that the post-receive hook of the repository would use to notify OpenShift of a new commit.  The gear repo would have access to the user's public keys as they do today (potentially within a separate gear group).  During a prepare, OpenShift would extract the source for the application into the cartridge image.
+
+Another consequence of write-once gears is that application environment should be moved out of the head gears.  Docker applies environment on startup, so it would be ideal to distribute environment via some private mechanism inside the node cluster and to pull that data on start.  
+
+This also enables the concept of compatible cartridges upgrades - for example from php-5.3 to php-5.4 - where a user may start on one version of the technology and later want to move up (or down) to a different compatible version.  The two cartridges have the same contract with the source code, but a developer would be able to choose that new cartridge version to apply on a given build.
+
+
+### Changes to manifest.yml
+
+A v3 manifest would look similar to a v2 manifest, with the addition of a "run" collection (list of commands to run).  A v3 manifest is a strict superset of a dockerfile.
+
+
+### Preparation
+
+To prepare a new gear, OpenShift will:
+
+1. Start a new **preparation gear** based on the primary cartridge image selected.
+2. Bind mount a tarball of the source code for the cartridge into a known directory
+3. Either invoke a command defined in the manifest via "docker attach" or use the run command of the cartridge image itself
+4. Command can invoke user defined hooks in the repo for build/deploy
+5. Wait for the container to start/finish
+6. Extract any necessary stateful information (environment variables, cartridge hooks, dynamic network endpoints)
+7. Perform a docker commit, push the docker image to the application owner's repository, and then report the new DA id to the broker
+8. The broker now knows that a new DA is available
+
+A prepare may result in the version of a cartridge in use changing in the broker - it may have been input by the developer at build time.  An application may have multiple cartridge versions in different gears as a result of a deploy.  The broker should gracefully handle rollforward and rollback of this scenario:
+
+1. Build and deploy v1 with PHP-5.3
+2. Build and deploy v2 with PHP-5.4
+3. Rollback to v1
+4. Next build and deployment should use PHP-5.3
+
+
+### Deployment
+
+The deployment process is as follows:
+
+1. Prepare a new version of the cartridge and get a DA id
+2. Take the id of the new DA and begin updating the gears in the gear group with that new artifact
+   * For web cartridges, a scale up, scale down operation is ideal.
+   * For DB / stateful cartridges, a replace in place is ideal - stop the old container, keep the old stateful directories and ports as is, and then start the new container.
+3. Once all gears are using the new DA, check whether the old DA should be deleted
+
+
+Scale up and scale down are essentially "start a DA with this id and this environment on this node".  Replace is more involved, and needs investigation.
+
+
+### Upgrades
+
+To upgrade a v3 gear (when a security update is released to a package):
+
+1. Identify all the base cartridges that would be affected
+2. For each cartridge:
+   1. Rebuild the cartridge from its dockerfile
+   2. Store the new version of the cartridge image alongside the old one
+   3. Mark all the applications using the old cartridge image as needing a rebuild
+3. For each application needing a rebuild
+   1. Trigger a rebuild and redeploy
+
+
+Plugin cartridges may complicate this story, and user installed packages complicate it further.  We may need a mechanism for categorizing gears into a searchable repo for packages.
+
+
+### Support for v2 gears
+
+In the short term, v2 and v3 can operate side by side through proper code isolation.  The system would use two pools of nodes, one for v2 and one for v3, with slightly different runtime code running on each.  In the future, v2 cartridges should be able to be directly ported to v3 and run in an emulation environment, thus allowing us to move off of v2 nodes.
+
+The v2 emulation environment would involve a RHEL 6.x image with all of the OpenShift cartridges and SDK scripts installed.  Each v2 gear would be copied and symlinked into the image as part of an initial migration, and the "run" command for the container would be "gear start" or a suitable wrapper.  Because the v2 gear home directory contains the cartridges, a v3 "replace gear" operation would continue to use persistence.  Updates on the v2 gear could be executed as they are today.
+
+It would be desirable to find 1:1 mappings between v3 and v2 cartridges where possible, and aggressively migrate gears.
+
+
+### Managing a gear
+
+The operations that act on a gear would change slightly - the primary ones in use would be stop, start, restart, and the informational calls.  Operations that mutate the gear would no longer be called - instead a whole new build would be instantiated.
+
+
+### Downloadable Cartridges
+
+A downloadable v2 cart is a manifest that links to a source URL.  The v3 manifest should be a superset of a dockerfile, which means that a user can specify a dockerfile as input to creating an app, and that dockerfile will become a downloadable cart for the app.  When prepare happens for that gear, we can easily build their custom cartridge as a base layer, then run prepare on top of it.  On subsequent builds, the base cartridge could be refreshed (via a different mechanism probably) which triggers a build.
+
+
+### Moving HAProxy out of Gears
+
+HAProxy within web gears complicates a number of processes.  For v3, we should investigate the creation and adoption of a routing layer to take edge traffic and route to gear groups based on endpoint data the broker has been made aware of.  We will also investigate the ability to deploy HAProxy gears within the application as a separate gear group.
+
+At a routing level, a further topic of investigation is the separation of traffic into low-volume/high-rate-of-change frontends, and high-volume/low-rate-of-change frontends.  Different technologies might be chosen for each which would allow new applications to go into the low-volume pool, and then moved into the high-volume pool via a DNS migration as an automated or administrative process.
+
+
+Additional Topics
+-----------------
+
+These topics need further investigation:
+
+* Enabling the ability to run 'yum' in a container and how that affects root security
+  * Needs discussion with Dan Walsh for security - need to elaborate all potential risks with RPM install inside container
+* Disk usage of layers can be extreme:
+  * Example is Java, where you may have 100M of base cartridge files, but Maven brings down 1GB of data
+  * Need to explore how builds and cartridges can coexist without making carts hard to write, and how we deal with lots of disk usage during prepare.
+* Density of docker containers
+* How can container hooks be supported - which are necessary and which are not
+* Examples of individual scenarios for each type of cartridge
+* Plugin cartridges - composition (more images and slower builds) or injection (limited capabilities)
+  * Cron
+  * Jenkins-client
+* The exact process by which large number of gears are updated
+* Details of how cartridges are built - we need to support multiple versions of each cartridge for much longer and the broker has to handle that
+* Supporting arbitrary docker images (environment only injection)
+* Updating a docker image in place (upgrade)
+* Letting users define a cartridge as a dockerfile - downloadable cartridge replacement
+* Gear migration across servers
+* Quota and images (can be managed in thinp in gears, docker registry should give us more).
+* Routing discussion, but we have 90% of everything we need
+* How do port mappings and the port limit change?
+* Is move still necessary?
+* Where are environment variables stored?
+  * In bind mount directory?
+  * Env vars now have to be distributed to all nodes
+* How are bind mounts from persistent per node storage managed?
+  * Same as today, bind /var/lib/openshift/<gear>/data to an arbitrary location rather than inside home
+* How does gear directory change?  No home mount automatic binding - home dir is transient per gear?
+* Two carts with same contract with source repo but different operating systems
+  * Both java-tomcat-maven, only one is supported
+  * UI/broker groups them together so you get a choice (RHEL supported, Fedora community supported)
+  * Community maintains one or the other
+  * Still need RPMs eventually for real distributions
+* SSH can be optionally implemented
+  * Similar model but different behavior, LXC attach, krishna looking at it.
+
+
+Risks
+-----
+
+* Density changes from high thousands
+* Cost to update gears
