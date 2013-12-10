@@ -29,13 +29,13 @@ A key design goal is to reduce the changes that occur inside of a gear after it 
 Specification
 -------------
 
-An OpenShift application is composed of 1..N gears.  Each gear represents an execution environment for 1 primary cartridge and 0..N secondary cartridges (also called plugins).  Each gear maps to one "container", which is a unix user, a SELinux category label, a home directory, and a set of exposed ports.
+A V2 OpenShift application is composed of 1..N gears.  Each gear represents an execution environment for 1 primary cartridge and 0..N secondary cartridges (also called plugins).  Each gear maps to one "container", which is a unix user, a SELinux category label, a home directory, and a set of exposed ports.
 
-A v3 gear should be a Docker container - which means that it is stopped and started via the Docker control API, initialized with environment via the Docker run command, and expected to use the same code from server to server.  The gear would be provided with mounted directories for mutable data.  In order to guarantee that a gear would continue to function in isolation, the **gear image** would be the result of combining the primary cartridge with the application source code (and any build results).  This allows the gear image to be started on multiple servers as the result of a scale up, without any communication required between gears.  Any change to a gear occurs on a build, which means that a single process is responsible for user code changes, security updates, and cartridge version changes.
+A Docker gear should be a Docker container - which means that it is stopped and started via the Docker control API, initialized with environment via the Docker run command, and expected to use the same code from server to server.  The gear would be provided with mounted directories for mutable data.  In order to guarantee that a gear would continue to function in isolation, the **gear image** would be the result of combining the primary cartridge with the application source code (and any build results).  This allows the gear image to be started on multiple servers as the result of a scale up, without any communication required between gears.  Any change to a gear occurs on a build, which means that a single process is responsible for user code changes, security updates, and cartridge version changes.
 
 An OpenShift cartridge is metadata that describes the capabilities of a set of software - likewise, a Dockerfile is metadata describing how to prepare a set of software for use in an image.  In OpenShift, we would treat the base Dockerfile elements - BASE, RUN, and EXECUTE - as new additions to the cartridge manifest, and we would map the remaining metadata to existing OpenShift elements.
 
-A v3 cartridge is a Docker image, with a set of metadata (a manifest) that can be translated to a Dockerfile for execution during a build.  The v3 manifest adds additional elements to handle the execution of steps and a RUN command.  v2 cartridges will have default values for these (bin/setup and bin/control start).  The act of transforming a cartridge image with cartridge hooks and/or source and build will be known as the **prepare** step ("preparing a cartridge"), and result in a **deployment artifact** which is a Docker image.
+A Docker cartridge is a Docker image, with a set of metadata (a manifest) that can be translated to a Dockerfile for execution during a build.  The Docker manifest adds additional elements to handle the execution of steps and a RUN command.  V2 cartridges will have default values for these (bin/setup and bin/control start).  The act of transforming a cartridge image with cartridge hooks and/or source and build will be known as the **prepare** step ("preparing a cartridge"), and result in a **deployment artifact** which is a Docker image.
 
 
 ### What's in a deployment artifact (Docker layers)?
@@ -92,7 +92,7 @@ In order to deliver security updates to cartridges, the operator must be able to
 
 Docker images live in a registry backed by some persistent storage.  OpenShift would run at least 2 registries - one for public images, and one for private images.  Public images would be where shared cartridges come from, but private images would be isolated per account (domain?) and not visible to others. The metadata describing cartridges would move to the broker, and be mediated via a set of APIs for administrators and users. Over time, OpenShift might expose access to the registries to external users so they can download and run gears locally.
 
-OpenShift should support V2 cartridges and V3 cartridges side by side.  Because of the scope of such a change, it is preferable to allow code paths to be application based - new applications might be created with a -v3 flag that marks the application, and those gears might run on nodes that were a different version of our code (or heavily branched).  The alternative is to do a very complex and potentially one way migration that removes features, with no easy way to abort that change. 
+OpenShift should support V2 cartridges and Docker cartridges side by side.  Because of the scope of such a change, it is preferable to allow code paths to be application based - new applications might be created with a -docker flag that marks the application, and those gears might run on nodes that were a different version of our code (or heavily branched).  The alternative is to do a very complex and potentially one way migration that removes features, with no easy way to abort that change. 
 
 In order to advance both high availability and the evolution of the platform, moving HAProxy out of the gears and into its own set of containers / layer would be ideal.  Further investigation is needed, but a number of open source projects have advanced sufficiently to where full HA routing is now possible without a deep investment.  In either case, the Routing SPI abstraction would allow us to choose how and when to move this functionality out of the main gears.
 
@@ -110,18 +110,18 @@ This also enables the concept of compatible cartridges upgrades - for example fr
 
 ### Changes to manifest.yml
 
-A v3 manifest would look similar to a v2 manifest, with the addition of a "run" collection (list of commands to run).  A v3 manifest is a strict superset of a dockerfile.
+A Docker manifest would look similar to a V2 manifest, with the addition of a "run" collection (list of commands to run).  A Docker manifest is a strict superset of a dockerfile.
 
-Dockerfile | v2 | v3 | Description
+Dockerfile | V2 | Docker | Description
 -----------|----|----|-------------
 FROM       |*default* RHEL 6.5 OpenShift Node environment|Runtime (URL or known constant)|The base image this cartridge depends on.
 MAINTAINER |-|Author|The author of this cartridge
 RUN        |*default* bin/install and bin/setup|Run|The series of steps used to initialize this cartridge on disk
-EXPOSE     |Endpoints|Endpoints|The internal ports and their metadata this cartridge exposes. Both V2 and V3 expose additional options as well as the protocol type.
+EXPOSE     |Endpoints|Endpoints|The internal ports and their metadata this cartridge exposes. Both V2 and Docker cartridges expose additional options as well as the protocol type.
 ENV        |*default* created during bin/setup| |An environment key and value this image starts with
 ADD        |SourceUrl| |A set of source files and destinations to copy into the container - Docker provides this at image creation time, OpenShift V2 allowed only an external URL that was downloaded into the root working directory
 ENTRYPOINT |*default* bin/control start|Execute|An executable that will be run when the container starts.
-CMD        |-|Execute|The default executable or arguments that will be run when the container starts. OpenShift V3 requires an executable, so a Dockerfile without CMD or ENTRYPOINT cannot be used as a cartridge.
+CMD        |-|Execute|The default executable or arguments that will be run when the container starts. OpenShift docker cartridges require an executable, so a Dockerfile without CMD or ENTRYPOINT cannot be used as a cartridge.
 VOLUME     |-| |A volume or directory that will be externally mounted into the running container.  Not supported in V2.
 USER       |*default* gear user| |The Unix user the container processes will start under
 WORKDIR    |*default* gear directory| |The working directory for the ENTRYPOINT
@@ -166,7 +166,7 @@ Scale up and scale down are essentially "start a DA with this id and this enviro
 
 ### Upgrades
 
-To upgrade a v3 gear (when a security update is released to a package):
+To upgrade a Docker gear (when a security update is released to a package):
 
 1. Identify all the base cartridges that would be affected
 2. For each cartridge:
@@ -180,13 +180,13 @@ To upgrade a v3 gear (when a security update is released to a package):
 Plugin cartridges may complicate this story, and user installed packages complicate it further.  We may need a mechanism for categorizing gears into a searchable repo for packages.
 
 
-### Support for v2 gears
+### Support for V2 gears
 
-In the short term, v2 and v3 can operate side by side through proper code isolation.  The system would use two pools of nodes, one for v2 and one for v3, with slightly different runtime code running on each.  In the future, v2 cartridges should be able to be directly ported to v3 and run in an emulation environment, thus allowing us to move off of v2 nodes.
+In the short term, V2 and Docker can operate side by side in a single OpenShift environment through proper code isolation.  The system would use two pools of nodes, one for V2 and one for Docker, with appropriate runtimes running in the nodes of each pool.  In the future, V2 cartridges should be able to be directly ported to Docker and run in an emulation environment, thus allowing us to move off of V2 nodes.
 
-The v2 emulation environment would involve a RHEL 6.x image with all of the OpenShift cartridges and SDK scripts installed.  Each v2 gear would be copied and symlinked into the image as part of an initial migration, and the "run" command for the container would be "gear start" or a suitable wrapper.  Because the v2 gear home directory contains the cartridges, a v3 "replace gear" operation would continue to use persistence.  Updates on the v2 gear could be executed as they are today.
+The V2 emulation environment would involve a RHEL 6.x image with all of the OpenShift cartridges and SDK scripts installed.  Each V2 gear would be copied and symlinked into the image as part of an initial migration, and the "run" command for the container would be "gear start" or a suitable wrapper.  Because the V2 gear home directory contains the cartridges, a Docker "replace gear" operation would continue to use persistence.  Updates on the V2 gear could be executed as they are today.
 
-It would be desirable to find 1:1 mappings between v3 and v2 cartridges where possible, and aggressively migrate gears.
+It would be desirable to find 1:1 mappings between Docker and V2 cartridges where possible, and aggressively migrate gears.
 
 
 ### Managing a gear
@@ -196,12 +196,12 @@ The operations that act on a gear would change slightly - the primary ones in us
 
 ### Downloadable Cartridges
 
-A downloadable v2 cart is a manifest that links to a source URL.  The v3 manifest should be a superset of a dockerfile, which means that a user can specify a dockerfile as input to creating an app, and that dockerfile will become a downloadable cart for the app.  When prepare happens for that gear, we can easily build their custom cartridge as a base layer, then run prepare on top of it.  On subsequent builds, the base cartridge could be refreshed (via a different mechanism probably) which triggers a build.
+A downloadable V2 cart is a manifest that links to a source URL.  The Docker manifest should be a superset of a dockerfile, which means that a user can specify a dockerfile as input to creating an app, and that dockerfile will become a downloadable cart for the app.  When prepare happens for that gear, we can easily build their custom cartridge as a base layer, then run prepare on top of it.  On subsequent builds, the base cartridge could be refreshed (via a different mechanism probably) which triggers a build.
 
 
 ### Moving HAProxy out of Gears
 
-HAProxy within web gears complicates a number of processes.  For v3, we should investigate the creation and adoption of a routing layer to take edge traffic and route to gear groups based on endpoint data the broker has been made aware of.  We will also investigate the ability to deploy HAProxy gears within the application as a separate gear group.
+HAProxy within web gears complicates a number of processes.  For Docker, we should investigate the creation and adoption of a routing layer to take edge traffic and route to gear groups based on endpoint data the broker has been made aware of.  We will also investigate the ability to deploy HAProxy gears within the application as a separate gear group.
 
 At a routing level, a further topic of investigation is the separation of traffic into low-volume/high-rate-of-change frontends, and high-volume/low-rate-of-change frontends.  Different technologies might be chosen for each which would allow new applications to go into the low-volume pool, and then moved into the high-volume pool via a DNS migration as an automated or administrative process.
 
