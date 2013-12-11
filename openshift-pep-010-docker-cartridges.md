@@ -128,12 +128,40 @@ WORKDIR    |*default* gear directory| |The working directory for the ENTRYPOINT
            | |Prepare|A path to a script (or an embedded script) that will be executed when a cartridge is **prepared**. 
 
 
+### Cartridge Author Workflow (basic case)
+
+![Cartridge author workflow](images/pep-010-cartridge-author.png)
+
+In the basic case, the cartridge author workflow is simple.  The cartridge author prepares a manifest and uses the `oo-admin-cartridge` tool to upload the manifest to the OpenShift Broker.  The manifest contains the following information:
+
+1. A reference to a publicly available docker image for the cartridge.
+2. A URL to a cartridge archive which contains a `prepare` script
+3. An optional URL to git repo to use as a template for the default git repo for the cartridge.  The currently supported syntax using #&lt;commit&gt; at the end of the URL to denote a specific commit revision is supported.
+
+The broker creates a record for the new cartridge.  The manifest is used as part of messages to create new applications or add cartridges to an application, and therefor the manifest content is contained in the record for the cartridge.  (TODO: add information re: versioning / streams)
+
+### App Creation Workflow (basic case)
+
+![App creation workflow](images/pep-010-app-create.png)
+
+The basic app creation workflow is as follows:
+
+1. An OpenShift user calls `rhc app-create <type>`
+2. `rhc` makes a rest call to the OpenShift broker to create a new application of the specified type
+3. The OpenShift broker creates a record for the new application
+4. The OpenShift broker makes a call to a Docker node to create a git gear, using the template for the cartridge for the default contents of the repo
+5. The OpenShift broker makes a call to create a builder gear from the cartridge image
+6. The OpenShift broker makes a call to the git gear to copy the contents of the git repo to the builder gear
+7. The OpenShift broker makes a call to the builder gear to create an image of the app by combining the git repo with the cartridge image.
+    1. The builder gear creates a new image for the application by combining the git repo with the cartridge base image (TODO: more detail)
+    2. The builder gear publishes the new application image to a private image repo
+8. The OpenShift broker make a call to create a new gear from the new application image
 
 ### Preparation
 
 To prepare a new gear, OpenShift will:
 
-1. Start a new **preparation gear** based on the primary cartridge image selected.
+1. Start a new **preparation gear** based on the primary cartridge image selected
 2. Bind mount a tarball of the source code for the cartridge into a known directory
 3. Either invoke a command defined in the manifest via "docker attach" or use the run command of the cartridge image itself
 4. Command can invoke user defined hooks in the repo for build/deploy
@@ -184,7 +212,7 @@ Plugin cartridges may complicate this story, and user installed packages complic
 
 V2 and Docker will operate side by side in a single OpenShift environment via application-based code path switching.  The system will use two pools of nodes, one for V2 applications and one for Docker applications, with appropriate runtimes running in the nodes of each pool.  New applications might be created with a flag indicating the stack to use with the application, and those gears would run only on nodes of the appropriate type.
 
-The workflow to upgrade an application from the V2 cartridge system to the Docker cartridge system is at this time unspecified. 
+The workflow to upgrade an application from the V2 cartridge system to the Docker cartridge system is currently unspecified. 
 
 
 ### Managing a gear
