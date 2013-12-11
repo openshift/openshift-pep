@@ -63,18 +63,18 @@ A Docker cartridge is a Docker image, with a set of metadata (a manifest) that c
 
 ### Creating a deployment artifact (a gear image) flow
 
-         +--------------+    +------------+
-         | User Git     | OR | Binary     |
-         | repo tarball |    | (WAR, zip) |
-         +------+-------+    +------+-----+
-                |                   |
-                +---------------+   |           +--------------+
-                                |   |           | Symlinks     |
-                                |   |           | Built WAR    |
-                                |   |           | User Source  |
-    +--------------+            |   |           +--------------+
-    | Scripts      |            |   |           | Scripts      |
-    | JBoss        |            v   v           | JBoss        |
+         +--------------+    +------------+     +-------------+
+         | User Git     | OR | Binary     | AND | App         |
+         | repo tarball |    | (WAR, zip) |     | Environment |
+         +------+-------+    +------+-----+  +- +-------------+
+                |                   |        |
+                +---------------+   |    +---+  +--------------+
+                                |   |    |      | Symlinks     |
+                                |   |    |      | Built WAR    |
+                                |   |    |      | User Source  |
+    +--------------+            |   |    |      +--------------+
+    | Scripts      |            |   |    |      | Scripts      |
+    | JBoss        |            v   v    v      | JBoss        |
     | Maven        +------> invoke prepare +--->| Maven        +---> save as new
     | OpenJDK      |        script              | OpenJDK      |     image in Docker
     +--------------+                            +--------------+
