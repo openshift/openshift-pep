@@ -92,7 +92,7 @@ In order to deliver security updates to cartridges, the operator must be able to
 
 Docker images live in a registry backed by some persistent storage.  OpenShift would run at least 2 registries - one for public images, and one for private images.  Public images would be where shared cartridges come from, but private images would be isolated per account (domain?) and not visible to others. The metadata describing cartridges would move to the broker, and be mediated via a set of APIs for administrators and users. Over time, OpenShift might expose access to the registries to external users so they can download and run gears locally.
 
-OpenShift should support V2 cartridges and Docker cartridges side by side.  Because of the scope of such a change, it is preferable to allow code paths to be application based - new applications might be created with a -docker flag that marks the application, and those gears might run on nodes that were a different version of our code (or heavily branched).  The alternative is to do a very complex and potentially one way migration that removes features, with no easy way to abort that change. 
+OpenShift should support V2 cartridges and Docker cartridges side by side.
 
 In order to advance both high availability and the evolution of the platform, moving HAProxy out of the gears and into its own set of containers / layer would be ideal.  Further investigation is needed, but a number of open source projects have advanced sufficiently to where full HA routing is now possible without a deep investment.  In either case, the Routing SPI abstraction would allow us to choose how and when to move this functionality out of the main gears.
 
@@ -180,13 +180,11 @@ To upgrade a Docker gear (when a security update is released to a package):
 Plugin cartridges may complicate this story, and user installed packages complicate it further.  We may need a mechanism for categorizing gears into a searchable repo for packages.
 
 
-### Support for V2 gears
+### V2 Interoperability
 
-In the short term, V2 and Docker can operate side by side in a single OpenShift environment through proper code isolation.  The system would use two pools of nodes, one for V2 and one for Docker, with appropriate runtimes running in the nodes of each pool.  In the future, V2 cartridges should be able to be directly ported to Docker and run in an emulation environment, thus allowing us to move off of V2 nodes.
+V2 and Docker will operate side by side in a single OpenShift environment via application-based code path switching.  The system will use two pools of nodes, one for V2 applications and one for Docker applications, with appropriate runtimes running in the nodes of each pool.  New applications might be created with a flag indicating the stack to use with the application, and those gears would run only on nodes of the appropriate type.
 
-The V2 emulation environment would involve a RHEL 6.x image with all of the OpenShift cartridges and SDK scripts installed.  Each V2 gear would be copied and symlinked into the image as part of an initial migration, and the "run" command for the container would be "gear start" or a suitable wrapper.  Because the V2 gear home directory contains the cartridges, a Docker "replace gear" operation would continue to use persistence.  Updates on the V2 gear could be executed as they are today.
-
-It would be desirable to find 1:1 mappings between Docker and V2 cartridges where possible, and aggressively migrate gears.
+The workflow to upgrade an application from the V2 cartridge system to the Docker cartridge system is at this time unspecified. 
 
 
 ### Managing a gear
