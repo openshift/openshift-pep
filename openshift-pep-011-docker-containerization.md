@@ -1,7 +1,7 @@
 PEP: 011  
 Title: OpenShift Containerization  
-Status: reviewed  
-Author: Tobias Kunze <tkunze@redhat.com>  
+Status: draft  
+Author: Krishna Raman <kraman@redhat.com>, Tobias Kunze <tkunze@redhat.com>  
 Arch Priority: high  
 Complexity: 100
 Affected Components: runtime, broker  
@@ -11,13 +11,20 @@ Epic:
 
 # Abstract
 
-The current design of OpenShift containers uses SELinux, CGroups, Pam namespaces, quota to provide isolation. Recent improvements in the Linux kernel provide
-additional features like namespacing which can be leveraged to improve the containerization and provide additional security. In addition, the libvirt-sandbox
-package has made setting up containers and management of containers easier and can be used with OpenShift.
+The current design of OpenShift containers uses SELinux, CGroups, Pam
+namespaces, quota to provide isolation. Recent improvements in the Linux
+kernel provide additional features like namespacing which can be
+leveraged to improve containerization and provide additional security.
+The [Docker cartridges PEP](openshift-pep-010-docker-cartridges.md)
+introduces the Docker container management tool, draws on work from the
+libvirt-sandbox project, and depends on a number of important kernel
+containerization concepts in order to enable efficient, secure, isolated
+containers.
+
 
 # Motivation (Background)
 
-Kernel has added a few new namespaces which provide additional isolation for gears:
+The kernel has added a few new namespaces which provide additional isolation for gears:
 
 	1. PID namespace: Provides each gear with its own set of PIDs starting at 1 so the are unable to see processes from other gears.
 	2. Network namespace: Provides each gear with its own 127.x.x.x IP address space and allowes adding custom network devices.
@@ -27,9 +34,24 @@ Kernel has added a few new namespaces which provide additional isolation for gea
 
 **Note** There are also user and memory namespaces but those are not enabled in Fedora by default.
 
-The LibVirt-Sandbox project[http://libvirt.org/git/?p=libvirt-sandbox.git] has packaged up these namespaces and provided a convenient way of setting up isolated containers. These containers can also be easily managed through the libvirt API.
+The LibVirt-Sandbox
+project[http://libvirt.org/git/?p=libvirt-sandbox.git] has packaged up
+these namespaces and provided a convenient way of setting up isolated
+containers. These containers can also be easily managed through the
+libvirt API.  At the same time, [Docker](www.docker.io), currently based
+on the LXC tooling, has introduced an ecosystem and management model
+around LXC that also introduces a filesystem namespace for isolating
+container dependencies.
 
-It is desirable to introduce LibVirt and Kernel namespace based containerization into OpenShift. For hosters, containerization helps make the economics work by allowing for a higher degree of overcommit. For anyone else running OpenShift, containerization massively simplifies setup and operations by making virtualization optional.
+It is desirable to introduce Docker, LibVirt, and Kernel namespace based
+containerization into OpenShift. For hosters, containerization helps
+make the economics work by allowing for a higher degree of overcommit.
+For anyone else running OpenShift, containerization massively simplifies
+setup and operations by making virtualization optional.  The use of
+Docker takes the final step in allowing the containers running on
+OpenShift to isolate and version the dependency chains that user
+software depends on.
+
 
 # Goals
 
@@ -41,7 +63,7 @@ The following is a list of goals, in descending order:
 
 3. Allow host root to **attach** to the container and run commands inside it, both as container root and container user
 
-4. Gears must be able to bind to **localhost**
+4. Gears must be able to bind to **0.0.0.0** in a predictable fashion
 
 5. Allow for gears to be moved between hosts with minimal reconfiguration.
 
@@ -67,7 +89,10 @@ The following is a list of goals, in descending order:
 
 ## Architecture
 
-The proposed solution is based on the git version of LibVirt and libvirt-sandbox and the newest Fedora 19. LibVirt builds on top of cgroups and kernel namespaces to provide the container technology. SELinux is managed through libvirt-sandbox.
+The proposed solution is based on the Docker plus libvirtd integration,
+running in Fedora and RHEL 6.5+. Libvirtd builds on top of cgroups and
+kernel namespaces to provide the container technology. SELinux is
+managed through Docker.
 
 **Note:** a Fedora 19 kernel is required for underlying `lxc-attach` support. However, even Fedora 19 does not include the memory cgroups controller (see goal 6 above) and user kernel namespace support.
 
@@ -105,6 +130,7 @@ Root is mounted `ro` in a container and the gear dir `/var/lib/openshift/gear/<u
 
     6. Use non-file based config for sssd to hide /etc/passwd,shadow,group files from gear
 
+
 ## Network
 
 The biggest change on the network side is related to switching from localhost gear addresses to routable addresses. If we use a routable address, port_proxy could be dropped and replaced with iptables. 
@@ -132,6 +158,7 @@ Currently the broker assign a UID to a gear and the 127.x.x.* ip range and exter
 
 **Note**: Even if 127.x.x.x IPs are not routable, F19 allows for creation of a dummy interface inside the container and assigning it a link-local (169.254.x.x) address. This allows the use of same DNAT iptables rules.
 
+
 ## User SSH access to the container
 
 Current container model uses standard *nix users and does not require any additional support for SSH. With LibVirt, SSH access to the gear will require the container to be started on demand.
@@ -139,6 +166,7 @@ Current container model uses standard *nix users and does not require any additi
 **Proposal:**
 
 A wrapper around `lxc-attach`, `virt-login-shell` is available as a LibVirt patch and is being reviewed for merge. `virt-login-shell` is a SUID program which will start the LibVirt container and switch the current process into the container namespace.
+
 
 ## Memory and CPU limits
 
@@ -150,6 +178,7 @@ The current container model directly modified cgroups to monitor and control mem
 
 	2. A new plugin will be created which will use LibVirt APIs to query CPU usage and set CPU and Memory limits
 
+
 ## Filesystem limits
 
 The current container model uses quotas to limit filesystem usage. With LibVirt containers, this is more complex as the container directory structure does not match up with the host, and thus the container is unable to read the quota DB.
@@ -157,6 +186,7 @@ The current container model uses quotas to limit filesystem usage. With LibVirt 
 **Proposal:**
 
 Still under investigation.
+
 
 ## Shared Filesystem
 
@@ -172,6 +202,7 @@ In the current container model, each gear is assigned a SELinux MCS label based 
 
 **Note:** A filesystem capable of providing high throughput cluster-wide storage still needs to be investigated.
 
+
 ## Idler
 
 In the current container model, un-idling an application is a complex and multi step process. SystemD socket-activation might provide a solution however, it requires cartridges to understand socket activation and use pre-created sockets which may not be possible.
@@ -180,37 +211,52 @@ In the current container model, un-idling an application is a complex and multi 
 
 	1. When container is idle, update iptables/firewalld and apache to point to a socket assigned to SystemD.
 	
-	2. When there is a connection attemp on that socket, SystemD will activate the container.
+	2. When there is a connection attempt on that socket, SystemD will activate the container.
 	
 	3. Once container is actve, update iptables/firewalld rules to point to the correct sockets on the container.
 	
 This will result in the first TCP SYN packet being lost, but the when a connection retry will attempted, it will reach the correct service. It also does not require the cartridge process to know about SystemdD socket activation.
 
+*Alternative Proposal:*
+
+  1. Introduce an idle-aware proxy in the network chain for public
+     HTTP/TCP sockets on applications
+
+  2. When there is a connection attempt on the proxy, notify OpenShift
+     to start at least one gear for the underlying application
+
+  3. Block until OpenShift or the gear begins to respond (either
+     alternative has limitations) and then allow traffic to continue
+
+  4. Shed traffic (503) if too many connections are waiting on a start,
+     and timeout / mark the backend down 
+
+The alternative proposal is less generic, but is less dependent on
+changes in the lower tiers.  It is most suitable for incoming edge
+traffic, but not easily used for inter-gear communication.
+
+
 ## Design
 
-Containerization is introduced into Origin in a pluggable manner (see new directory tree under `plugins/container`) where everything was baked into the code based on SELinux before.
+Containerization on Docker will be introduced by adding a new type of
+OpenShift node to the system - one that listens on MCollective for a new
+message schema from the existing V2 work.  This node would be a host for
+Docker based containers only, and have different runtime code to account
+for the proposed changes.
 
-The new (pluggable) container API shall be compatible with Docker ([http://www.docker.io/](http://www.docker.io/)). Docker is another implementation of LXC which works on Debian systems, without SELinux.
+**Note:** Needs further elaboration
 
-**Note:** we are not planning to implement a plugin for Docker, but if a community member decides they want it, they can write one.
-
-**Note:** Docker relies on AUFS ([http://aufs.sourceforge.net/](http://aufs.sourceforge.net/)), which did not make it into upstream Kernel and will not be supported.
 
 ## Miscellaneous Changes
 
-To support the execution goal above, the old exec commands, kernel.exec and utils.oo_spawn have been replaced/wrapped with new methods:
-
-* `run_in_container_context`
-
-* `run_in_container_root_context`
-
-The old network interface methods have been fully implemented to assign routable addresses.
+**Note:** Needs further elaboration
 
 **Note:** Existing architecture relies on uid=gid for all gears. If the node machine had a gid that is allocated to some other user, then the sync between uid/gid breaks and causes gear creation failures. See [bug# 967146](https://bugzilla.redhat.com/show_bug.cgi?id=967146).
 
 **Note:** We don’t need to pre-label IP addresses anymore once IP namespacing is available, so we shouldn’t be limited in how many UIDs and GIDs we can give out.
 
 **Note:** Since the pam folks didn’t like namespace switching, ssh logins have been changed from relying on pam to a new setuid script performing the necessary routing.
+
 
 # Open Issues
 
@@ -222,17 +268,18 @@ The old network interface methods have been fully implemented to assign routable
 
 * Kernel user namespaces are not yet in any released kernel, albeit there are patches that can be applied to newest kernels beyond the current stable 3.8.2. Dan Walsh suggest to hold off on user namespaces and thinks they are highly experimental. Justin also pointed out that they are incompatible with xfs. The solution is to fix xfs, but I'm not aware of any work in that area. As a result, though, Fedora will not enable it until xfs is fixed.
 
-* Security in general is an issue.
+* Security in general is an issue. Containers must be isolated from root
+escalation, from visibilty to other containers, and from network
+exposure.
 
-* Package upgrades are not generally supported inside containers, due to a variety of differences from real systems such as bind-mounting of files (that thus can't be replaced), bad interactions between udev and device mounting, security rules, dropped capabilities (Ubuntu), etc. This means that security updates would either require QA upfront to determine if they succeed or the container needs to be shut down.
+* The security of Docker container level packages needs to be thoroughly
+evaluated.  Docker allows filesystem CoW consistency via thinp, but
+package installation still requires root level escalation.
 
-**Note:** in-container package upgrades or package isolation is out of scope for now.
-
-**Note:** [mmcgrath:] sticking with system-side package upgrades has important benefits w/respect to security and operational efficiency.
 
 # Near-term Requirements for Other Packages
 
-* libvirt-sandbox
+* **DEPRECATED**: libvirt-sandbox
 
     * /tmp should be bind-mounted instead of being a tmpfs so the git work OpenShift performs within /tmp doesn’t end up squeezing RAM.
 

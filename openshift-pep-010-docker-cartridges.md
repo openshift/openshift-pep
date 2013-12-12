@@ -16,7 +16,12 @@ Leverage Docker in OpenShift to deliver a more flexible and powerful distributio
 
 We would alter the build/deployment/cartridge model to focus more on image deployment - source code changes are combined with a cartridge (build/deployment/execution environment) to create a docker image that can be easily scaled up or rolled back to.  Users would be able to install their own packages and run their gear images on their local laptops.  In addition, we would enable easier distribution and execution mechanisms for cartridges that build on our existing system.  We would enable more controlled upgrades, deployments, and version to version changes.
 
-This PEP depends on and modifies [PEP 002: Cartridges V2](https://github.com/openshift/openshift-pep/blob/master/openshift-pep-002-cartridge-v2.md).
+This PEP depends on and modifies [PEP 002: Cartridges
+V2](https://github.com/openshift/openshift-pep/blob/master/openshift-pep-002-cartridge-v2.md).
+It defines the use cases which [PEP 011: Docker
+containerization](https://github.com/openshift/openshift-pep/blob/master/openshift-pep-010-docker-cartridges.md)
+must address from a technical standpoint.
+
 
 Background
 ----------
