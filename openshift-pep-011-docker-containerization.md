@@ -1,4 +1,4 @@
-PEP: 7  
+PEP: 011  
 Title: OpenShift Containerization  
 Status: reviewed  
 Author: Tobias Kunze <tkunze@redhat.com>  
