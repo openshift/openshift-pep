@@ -216,6 +216,7 @@ These topics need further investigation:
   * Need to explore how builds and cartridges can coexist without making carts hard to write, and how we deal with lots of disk usage during prepare.
 * Density of docker containers
 * How can container hooks be supported - which are necessary and which are not
+  * Should hooks be run at build time by passing in the info about the current app, and then the env vars are changed as the app is rolled out?
 * Examples of individual scenarios for each type of cartridge
 * Plugin cartridges - composition (more images and slower builds) or injection (limited capabilities)
   * Cron
