@@ -149,26 +149,24 @@ The basic app creation workflow is as follows:
 1. An OpenShift user calls `rhc app-create <type>`
 2. `rhc` makes a rest call to the OpenShift broker to create a new application of the specified type
 3. The OpenShift broker creates a record for the new application
-4. The OpenShift broker makes a call to a Docker node to create a git gear, using the template for the cartridge for the default contents of the repo
-5. The OpenShift broker makes a call to create a builder gear from the cartridge image
-6. The OpenShift broker makes a call to the git gear to copy the contents of the git repo to the builder gear
-7. The OpenShift broker makes a call to the builder gear to create an image of the app by combining the git repo with the cartridge image.
-    1. The builder gear creates a new image for the application by combining the git repo with the cartridge base image (TODO: more detail)
-    2. The builder gear publishes the new application image to a private image repo
-8. The OpenShift broker make a call to create a new gear from the new application image
+4. The broker makes a call to a Docker node to create a git gear, passing the template git repo URL
+    1. The node downloads the specified template repo
+    2. The node creates a new git repository from the template content
+5. The broker starts the prepare workflow.
 
-### Preparation
+The prepare workflow is as follows:
 
-To prepare a new gear, OpenShift will:
-
-1. Start a new **preparation gear** based on the primary cartridge image selected
-2. Bind mount a tarball of the source code for the cartridge into a known directory
-3. Either invoke a command defined in the manifest via "docker attach" or use the run command of the cartridge image itself
-4. Command can invoke user defined hooks in the repo for build/deploy
-5. Wait for the container to start/finish
-6. Extract any necessary stateful information (environment variables, cartridge hooks, dynamic network endpoints)
-7. Perform a docker commit, push the docker image to the application owner's repository, and then report the new DA id to the broker
-8. The broker now knows that a new DA is available
+1. The broker makes a call to create a builder gear, passing the manifest and git repo:
+    1. The node downloads the application git repo into a known directory for bind-mount into the builder gear container
+    2. If the manifest defines a prepare command, starts the container with `docker run -e <prepare cmd>`
+    3. If not, the node starts the container with `docker run`
+    4. The node waits for the container to finish running, imposing a timeout
+    5. The node extracts (method TBD) any necessary stateful information such as: environment variables, cartridge hooks, dynamic network endpoints
+    6. The node performs a docker commit
+    7. The node pushes the docker image to the application's private docker registry
+    8. The node reports the new deployment artifact (DA) id to the broker
+2. The broker creates a new (DA) record for the application
+3. The broker starts the deploy workflow
 
 A prepare may result in the version of a cartridge in use changing in the broker - it may have been input by the developer at build time.  An application may have multiple cartridge versions in different gears as a result of a deploy.  The broker should gracefully handle rollforward and rollback of this scenario:
 
@@ -177,15 +175,14 @@ A prepare may result in the version of a cartridge in use changing in the broker
 3. Rollback to v1
 4. Next build and deployment should use PHP-5.3
 
-
 ### Deployment
 
 The deployment process is as follows:
 
 1. Prepare a new version of the cartridge and get a DA id
 2. Take the id of the new DA and begin updating the gears in the gear group with that new artifact
-   * For web cartridges, a scale up, scale down operation is ideal.
-   * For DB / stateful cartridges, a replace in place is ideal - stop the old container, keep the old stateful directories and ports as is, and then start the new container.
+    1. For web cartridges, a scale up, scale down operation is ideal.
+    2. For DB / stateful cartridges, a replace in place is ideal - stop the old container, keep the old stateful directories and ports as is, and then start the new container.
 3. Once all gears are using the new DA, check whether the old DA should be deleted
 
 
