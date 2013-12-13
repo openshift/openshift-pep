@@ -128,19 +128,45 @@ WORKDIR    |*default* gear directory| |The working directory for the ENTRYPOINT
            | |Prepare|A path to a script (or an embedded script) that will be executed when a cartridge is **prepared**. 
 
 
+### Cartridge Author Workflow (basic case)
 
-### Preparation
+![Cartridge author workflow](images/pep-010-cartridge-author.png)
 
-To prepare a new gear, OpenShift will:
+In the basic case, the cartridge author workflow is simple.  The cartridge author prepares a manifest and uses the `oo-admin-cartridge` tool to upload the manifest to the OpenShift Broker.  The manifest contains the following information:
 
-1. Start a new **preparation gear** based on the primary cartridge image selected.
-2. Bind mount a tarball of the source code for the cartridge into a known directory
-3. Either invoke a command defined in the manifest via "docker attach" or use the run command of the cartridge image itself
-4. Command can invoke user defined hooks in the repo for build/deploy
-5. Wait for the container to start/finish
-6. Extract any necessary stateful information (environment variables, cartridge hooks, dynamic network endpoints)
-7. Perform a docker commit, push the docker image to the application owner's repository, and then report the new DA id to the broker
-8. The broker now knows that a new DA is available
+1. A reference to a publicly available docker image for the cartridge.
+2. A URL to a cartridge archive which contains a `prepare` script
+3. An optional URL to git repo to use as a template for the default git repo for the cartridge.  The currently supported syntax using #&lt;commit&gt; at the end of the URL to denote a specific commit revision is supported.
+
+The broker creates a record for the new cartridge.  The manifest is used as part of messages to create new applications or add cartridges to an application, and therefor the manifest content is contained in the record for the cartridge.  (TODO: add information re: versioning / streams)
+
+### App Creation Workflow (basic case)
+
+![App creation workflow](images/pep-010-app-create.png)
+
+The basic app creation workflow is as follows:
+
+1. An OpenShift user calls `rhc app-create <type>`
+2. `rhc` makes a rest call to the OpenShift broker to create a new application of the specified type
+3. The OpenShift broker creates a record for the new application
+4. The broker makes a call to a Docker node to create a git gear, passing the template git repo URL
+    1. The node downloads the specified template repo
+    2. The node creates a new git repository from the template content
+5. The broker starts the prepare workflow.
+
+The prepare workflow is as follows:
+
+1. The broker makes a call to create a builder gear, passing the manifest and git repo:
+    1. The node downloads the application git repo into a known directory for bind-mount into the builder gear container
+    2. If the manifest defines a prepare command, starts the container with `docker run -e <prepare cmd>`
+    3. If not, the node starts the container with `docker run`
+    4. The node waits for the container to finish running, imposing a timeout
+    5. The node extracts (method TBD) any necessary stateful information such as: environment variables, cartridge hooks, dynamic network endpoints
+    6. The node performs a docker commit
+    7. The node pushes the docker image to the application's private docker registry
+    8. The node reports the new deployment artifact (DA) id to the broker
+2. The broker creates a new (DA) record for the application
+3. The broker starts the deploy workflow
 
 A prepare may result in the version of a cartridge in use changing in the broker - it may have been input by the developer at build time.  An application may have multiple cartridge versions in different gears as a result of a deploy.  The broker should gracefully handle rollforward and rollback of this scenario:
 
@@ -149,15 +175,14 @@ A prepare may result in the version of a cartridge in use changing in the broker
 3. Rollback to v1
 4. Next build and deployment should use PHP-5.3
 
-
 ### Deployment
 
 The deployment process is as follows:
 
 1. Prepare a new version of the cartridge and get a DA id
 2. Take the id of the new DA and begin updating the gears in the gear group with that new artifact
-   * For web cartridges, a scale up, scale down operation is ideal.
-   * For DB / stateful cartridges, a replace in place is ideal - stop the old container, keep the old stateful directories and ports as is, and then start the new container.
+    1. For web cartridges, a scale up, scale down operation is ideal.
+    2. For DB / stateful cartridges, a replace in place is ideal - stop the old container, keep the old stateful directories and ports as is, and then start the new container.
 3. Once all gears are using the new DA, check whether the old DA should be deleted
 
 
@@ -184,7 +209,7 @@ Plugin cartridges may complicate this story, and user installed packages complic
 
 V2 and Docker will operate side by side in a single OpenShift environment via application-based code path switching.  The system will use two pools of nodes, one for V2 applications and one for Docker applications, with appropriate runtimes running in the nodes of each pool.  New applications might be created with a flag indicating the stack to use with the application, and those gears would run only on nodes of the appropriate type.
 
-The workflow to upgrade an application from the V2 cartridge system to the Docker cartridge system is at this time unspecified. 
+The workflow to upgrade an application from the V2 cartridge system to the Docker cartridge system is currently unspecified. 
 
 
 ### Managing a gear
