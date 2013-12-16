@@ -138,7 +138,7 @@ In the basic case, the cartridge author workflow is simple.  The cartridge autho
 2. A URL to a cartridge archive which contains a `prepare` script
 3. An optional URL to git repo to use as a template for the default git repo for the cartridge.  The currently supported syntax using #&lt;commit&gt; at the end of the URL to denote a specific commit revision is supported.
 
-The broker creates a record for the new cartridge.  The manifest is used as part of messages to create new applications or add cartridges to an application, and therefor the manifest content is contained in the record for the cartridge.  (TODO: add information re: versioning / streams)
+The broker creates a record for the new cartridge.  The manifest is used as part of messages to create new applications or add cartridges to an application, and therefore the manifest content is contained in the record for the cartridge.  (TODO: add information re: versioning / streams)
 
 ### App Creation Workflow (basic case)
 
@@ -149,10 +149,10 @@ The basic app creation workflow is as follows:
 1. An OpenShift user calls `rhc app-create <type>`
 2. `rhc` makes a rest call to the OpenShift broker to create a new application of the specified type
 3. The OpenShift broker creates a record for the new application
-4. The broker makes a call to a Docker node to create a git gear, passing the template git repo URL
+4. The broker makes a call to a Docker node (an OpenShift node which is configured to support Docker-based gears) to create a git gear, passing the template git repo URL
     1. The node downloads the specified template repo
     2. The node creates a new git repository from the template content
-5. The broker starts the prepare workflow.
+5. The broker starts the prepare workflow
 
 The prepare workflow is as follows:
 
