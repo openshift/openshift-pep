@@ -26,7 +26,12 @@ packages and run their gear images on their local laptops.  In addition, we woul
 distribution and execution mechanisms for cartridges that build on our existing system.  We would
 enable more controlled upgrades, deployments, and version to version changes.
 
-This PEP depends on and modifies [PEP 002: Cartridges V2](https://github.com/openshift/openshift-pep/blob/master/openshift-pep-002-cartridge-v2.md).
+This PEP depends on and modifies [PEP 002: Cartridges
+V2](https://github.com/openshift/openshift-pep/blob/master/openshift-pep-002-cartridge-v2.md).
+It defines the use cases which [PEP 011: Docker
+containerization](https://github.com/openshift/openshift-pep/blob/master/openshift-pep-010-docker-cartridges.md)
+must address from a technical standpoint.
+
 
 Background
 ----------
