@@ -176,6 +176,58 @@ down) to a different compatible version.  The two cartridges have the same contr
 code, but a developer would be able to choose that new cartridge version to apply on a given build.
 
 
+### Container security
+
+In the Linux kernel the user namespace feature offers the ability for a container to have a root
+user that is actually a normal-user on the system.  However, this feature is new and the potential
+for vulnerabilities at this layer remains high.  In the short term (2013 into 2014), security
+conscious container operators should still run containers as non-root.  In OpenShift, the focus will
+be on enabling the use of images that may have been created or built with root access, but which at
+execution time are still jailed to a normal user.  Trusted users may still be allowed to build
+cartridges within the system, but still require a regular user for execution.
+
+
+### Process management
+
+Docker defines a container entrypoint -- an executable script or shell command -- that will be
+executed when the container is started.  This entrypoint is expected to be a standard Unix process:
+
+* It should respond to signals (like SIGTERM when docker is ready to shutdown)
+* It should either log to disk, syslog, or STDERR/STDOUT
+* When the process goes away, Docker considers the container stopped.
+
+In general, cartridges should expose the lowest level process that can manage the work the cartridge
+accomplishes.  Using SystemD or SysInit within a cartridge generally brings additional behavior that
+prevents the platform itself (if not initially, then later) from offering advanced process
+management.  An example would be restarting stuck processes - it would be better if the platform
+(Docker, OpenShift, or OpenShift using SystemD) could track the stuck/failing state and expose that
+information back to a user.  If the cartridge hides that from the platform, then it is much harder
+to aggregate that information.
+
+Another concern for cartridge authors - the signal Docker uses to terminate a process is SIGTERM,
+and if a wrapper script is used that does not respond to SIGTERM, then the end result will be a
+SIGKILL.  The process entrypoint should be sure to respond to SIGTERM gracefully.
+
+SystemD integration with Docker is an area of active investigation - there are many process
+management capabilities that would be ideal to manage from SystemD vs Docker / OpenShift.
+
+
+### Log management
+
+Different frameworks and languages offer different log capabilities, and many require significant
+configuration to work in different modes.  OpenShift should offer platform tooling that simplifies
+the scenarios described below where possible:
+
+1. Allow cartridges to write log data to disk into transient or mounted volume directories.
+2. Cartridge STDOUT/STDERR can be redirected by the platform to arbitrary locations.
+3. Per-container syslog mounts could be exposed that a cartridge could write to.
+4. Cartridge code can support language/framework specific log output that may go to external
+   sources (log4j remote logging, etc)
+
+As a cartridge author, information about how a cartridge logs should be exposed via the manifest,
+and OpenShift would delegate that information as necessary to integrators.
+
+
 ### Changes to manifest.yml
 
 A Docker manifest would look similar to a V2 manifest, with the addition of a "run" collection (list
