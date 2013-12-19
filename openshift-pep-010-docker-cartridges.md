@@ -440,6 +440,8 @@ These topics need further investigation:
   * Still need RPMs eventually for real distributions
 * SSH can be optionally implemented
   * Similar model but different behavior, LXC attach, krishna looking at it.
+* How do we rebuild without grabbing new dependencies?  How do we do a security update that doesn't need a build efficiently?  If we take a security update and break because of a build dependency change, that's worse than the security update breaking the app.
+* Point to point image distribution between nodes is preferred, although it requires us to manage our own availability.  Can't have redundancy for image backups without it.
 
 
 Risks
