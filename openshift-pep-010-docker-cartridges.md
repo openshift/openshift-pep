@@ -45,8 +45,7 @@ locations, routing moves out of gears and nodes).
 A key design goal is to reduce the changes that occur inside of a gear after it is created - in
 theory, reduce the changes to solely user application state, vs cartridge or gear state.
 
-
-Specification
+Core Concepts
 -------------
 
 A V2 OpenShift application is composed of 1..N gears.  Each gear represents an execution environment
@@ -171,8 +170,8 @@ gear repo would have access to the user's public keys as they do today (potentia
 separate gear group).  During a prepare, OpenShift would extract the source for the application into
 the cartridge image.
 
-Another consequence of write-once gears is that application environment should be moved out of the
-head gears.  Docker applies environment on startup, so it would be ideal to distribute environment
+Another consequence of write-once gears is that application environment should exist outside any 
+gear.  Docker applies environment on startup, so it would be ideal to distribute environment
 via some private mechanism inside the node cluster and to pull that data on start.
 
 This also enables the concept of compatible cartridges upgrades - for example from php-5.3 to
@@ -233,6 +232,10 @@ As a cartridge author, information about how a cartridge logs should be exposed 
 and OpenShift would delegate that information as necessary to integrators.
 
 
+Specification
+-------------
+
+
 ### Changes to manifest.yml
 
 A Docker manifest would look similar to a V2 manifest, with the addition of a "run" collection (list
@@ -253,6 +256,16 @@ USER       |*default* gear user| |The Unix user the container processes will sta
 WORKDIR    |*default* gear directory| |The working directory for the ENTRYPOINT
            | |Prepare|A path to a script (or an embedded script) that will be executed when a cartridge is **prepared**.
 
+### Implementation Note: V2 Interoperability
+
+V2 and Docker will operate side by side in a single OpenShift environment via application-based code
+path switching.  The system will use two pools of nodes, one for V2 applications and one for Docker
+applications, with appropriate runtimes running in the nodes of each pool.  New applications might
+be created with a flag indicating the stack to use with the application, and those gears would run
+only on nodes of the appropriate type.
+
+The workflow to upgrade an application from the V2 cartridge system to the Docker cartridge system
+is currently unspecified.
 
 ### Cartridge Author Workflow (basic case)
 
@@ -272,7 +285,7 @@ The broker creates a record for the new cartridge.  The manifest is used as part
 create new applications or add cartridges to an application, and therefore the manifest content is
 contained in the record for the cartridge.  (TODO: add information re: versioning / streams)
 
-### App Creation Workflow (basic case)
+### App Creation Workflow
 
 ![App creation workflow](images/pep-010-app-create.png)
 
@@ -288,7 +301,10 @@ The basic app creation workflow is as follows:
     2. The node creates a new git repository from the template content
 5. The broker starts the prepare workflow
 
-The prepare workflow is as follows:
+
+### Image Preparation Workflow
+
+The gear image preparation workflow is as follows:
 
 1. The broker makes a call to create a builder gear, passing the manifest and git repo:
     1. The node downloads the application git repo into a known directory for bind-mount into
@@ -315,7 +331,8 @@ rollback of this scenario:
 3. Rollback to v1
 4. Next build and deployment should use PHP-5.3
 
-### Deployment
+
+### Deployment Workflow
 
 The deployment process is as follows:
 
@@ -327,11 +344,57 @@ The deployment process is as follows:
 3. Once all gears are using the new DA, check whether the old DA should be deleted
 
 
-Scale up and scale down are essentially "start a DA with this id and this environment on this node".
-Replace is more involved, and needs investigation.
+## Gear management
+
+Due to the write-once nature of Docker gears, there are significantly less operations that can be
+performed on Docker gears than on V2 gears.  Operations that would mutate a V2 gear instead result 
+in a new image being prepared for an application's web gears.  This makes it possible for there to 
+be three fundamental operations that can be performed on Docker gears: scale up, scale down, and
+replace.
 
 
-### Upgrades
+### Scale Up Workflow
+
+The scale up workflow is as follows:
+
+1. The broker makes a call to scale up a new gear from a deployment ID:
+    1.  The broker must provide sufficient information to the node for the node to securely retrieve
+    the gear image. While the exact process will be defined elsewhere, the node is not assumed to
+    have read access to all gear images in the system for security reasons.
+    2. The node establishes process isolation for the gear container on the node.  This might be
+    creating a unix user for a gear and/or creating selinux categories, etc.
+    3. The node starts the container with the application's environment variables and a bind-mount into
+    the application's external storage.
+    4. The node makes the gear routable on a node-level.
+2. The broker makes a call to the routing layer to route application requests to the new gear.
+
+### Scale Down Workflow
+
+1. The broker makes a call to the routing later to disable routing application requests to the 
+   gear being scaled down.
+2.  The broker makes a call to scale down the gear on the node:
+    1.  The node gracefully stops the container
+    2.  The node removes the node-level routing for the gear
+    3.  The node removes any artifacts of process isolation for the gear
+
+### Replace Workflow
+
+1. The broker makes a call to the node where the gear is running to replace the gear, passing the 
+   gear uuid and the DA id to replace to.
+    1.  The node stops the container
+    2.  The node restarts the container using the new DA
+
+There are several use-cases that replace has to support with need to be further explored:
+
+1. Avoid changing IP address or port bindings, as these would potentially necessitate 
+   environment changes.
+2. Endpoint changes across versions of DAs
+3. Mountpoint changes across versions of DAs
+
+Docker currently doesn't directly support switching out an image for a process and starting another
+image with the same mounts / user / network bindings, but it has been requested.
+
+## Upgrades
 
 To upgrade a Docker gear (when a security update is released to a package):
 
@@ -346,25 +409,6 @@ To upgrade a Docker gear (when a security update is released to a package):
 
 Plugin cartridges may complicate this story, and user installed packages complicate it further.  We
 may need a mechanism for categorizing gears into a searchable repo for packages.
-
-
-### V2 Interoperability
-
-V2 and Docker will operate side by side in a single OpenShift environment via application-based code
-path switching.  The system will use two pools of nodes, one for V2 applications and one for Docker
-applications, with appropriate runtimes running in the nodes of each pool.  New applications might
-be created with a flag indicating the stack to use with the application, and those gears would run
-only on nodes of the appropriate type.
-
-The workflow to upgrade an application from the V2 cartridge system to the Docker cartridge system
-is currently unspecified.
-
-
-### Managing a gear
-
-The operations that act on a gear would change slightly - the primary ones in use would be stop,
-start, restart, and the informational calls.  Operations that mutate the gear would no longer be
-called - instead a whole new build would be instantiated.
 
 
 ### Downloadable Cartridges
@@ -440,8 +484,11 @@ These topics need further investigation:
   * Still need RPMs eventually for real distributions
 * SSH can be optionally implemented
   * Similar model but different behavior, LXC attach, krishna looking at it.
-* How do we rebuild without grabbing new dependencies?  How do we do a security update that doesn't need a build efficiently?  If we take a security update and break because of a build dependency change, that's worse than the security update breaking the app.
-* Point to point image distribution between nodes is preferred, although it requires us to manage our own availability.  Can't have redundancy for image backups without it.
+* How do we rebuild without grabbing new dependencies?  How do we do a security update that doesn't 
+need a build efficiently?  If we take a security update and break because of a build dependency change,
+that's worse than the security update breaking the app.
+* Point to point image distribution between nodes is preferred, although it requires us to manage our
+own availability.  Can't have redundancy for image backups without it.
 
 
 Risks
