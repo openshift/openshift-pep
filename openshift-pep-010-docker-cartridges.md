@@ -275,8 +275,8 @@ In the basic case, the cartridge author workflow is simple.  The cartridge autho
 manifest and uses the `oo-admin-cartridge` tool to upload the manifest to the OpenShift Broker.  The
 manifest contains the following information:
 
-1. A reference to a publicly available docker image for the cartridge.
-2. A URL to a cartridge archive which contains a `prepare` script
+1. A reference to a publicly available docker image for the cartridge (cartridge image)
+2. A path within the cartridge image that is the `prepare` script
 3. An optional URL to git repo to use as a template for the default git repo for the cartridge.
    The currently supported syntax using #&lt;commit&gt; at the end of the URL to denote a specific
    commit revision is supported.
