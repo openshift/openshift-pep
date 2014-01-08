@@ -73,7 +73,9 @@ a Dockerfile for execution during a build.  The Docker manifest adds additional 
 the execution of steps and a RUN command.  V2 cartridges will have default values for these
 (bin/setup and bin/control start).  The act of transforming a cartridge image with cartridge hooks
 and/or source and build will be known as the **prepare** step ("preparing a cartridge"), and result
-in a **deployment artifact** which is a Docker image.
+in a **deployment artifact** which is a Docker image.  Since **prepare** may contain dependencies, 
+downloads, or unreliable options that may fail, subsequent **prepare** operations may wish to reuse
+the contents of the prior image.
 
 
 ### What's in a deployment artifact (Docker layers)?
@@ -131,7 +133,10 @@ gear after launch.
 
 In order to deliver security updates to cartridges, the operator must be able to regenerate docker
 images and then trigger builds in affected gears.  This is a long running operation and may also
-involve skipping failed builds and notifying affected users.
+involve skipping failed builds and notifying affected users.  Cartridge authors may need to 
+provide additional functionality to allow incremental layer creation - reusing downloaded 
+dependencies and generated files from a previous image - in order to ensure security updates do not
+break user applications unintentionally.
 
 Docker images live in a registry backed by some persistent storage.  OpenShift would run at least 2
 registries - one for public images, and one for private images.  Public images would be where shared
@@ -272,7 +277,7 @@ is currently unspecified.
 ![Cartridge author workflow](images/pep-010-cartridge-author.png)
 
 In the basic case, the cartridge author workflow is simple.  The cartridge author prepares a
-manifest and uses the `oo-admin-cartridge` tool to upload the manifest to the OpenShift Broker.  The
+manifest and uses the `oo-admin-ctl-cartridge` tool to upload the manifest to the OpenShift Broker.  The
 manifest contains the following information:
 
 1. A reference to a publicly available docker image for the cartridge (cartridge image)
@@ -302,7 +307,7 @@ The basic app creation workflow is as follows:
 5. The broker starts the prepare workflow
 
 
-### Image Preparation Workflow
+### Gear Image Preparation Workflow
 
 The gear image preparation workflow is as follows:
 
@@ -313,13 +318,49 @@ The gear image preparation workflow is as follows:
        `docker run -e <prepare cmd>`
     3. If not, the node starts the container with `docker run`
     4. The node waits for the container to finish running, imposing a timeout
-    5. The node extracts (method TBD) any necessary stateful information such as: environment
+    5. The node extracts from the container (method TBD) any necessary stateful information such as: environment
        variables, cartridge hooks, dynamic network endpoints
-    6. The node performs a docker commit
+    6. The node performs a docker commit which creates the **deployment layer**
     7. The node pushes the docker image to the application's private docker registry
     8. The node reports the new deployment artifact (DA) id to the broker
 2. The broker creates a new (DA) record for the application
 3. The broker starts the deploy workflow
+
+#### Incremental Image Preparation
+
+The preparation described above is a **clean prepare** - completely regenerating the layer containing the user source code.  A consequence of a clean prepare is that the prepare script must redownload any dependencies of the application source (Ruby gems, Python eggs, Maven JARs).  This may result in the versions of those dependencies changing and the introduction of failures or bugs.  Therefore, there must be the possibility of an **incremental prepare** for security updates that allows a cartridge to reuse some or all of the previously generated content.
+
+Potential problems caused by reusing a previous deployment layer:
+
+* A cartridge might override system libraries with newer versions - those libraries might have the same security vulnerability that the system administrator is trying to patch
+* Libraries updated in the deployment layer may be intermixed with libraries from the cartridge layer, and a new library added to the cartridge layer that also exists in the deployment layer might prevent the runtime from starting because of incompatible versions.  
+* Update may require the rebuild of compiled dependecies or code in order to patch a vulnerability / bug
+* The location of dependencies the cartridge expects may change
+
+In all of these scenarios, the cartridge author and platform must coordinate around which content can be reused and when a full rebuild is required.
+
+The incremental prepare workflow might look like:
+
+1. The broker makes a call to create a builder gear, passing the manifest, git repo, and previous gear image id:
+    1. The node downloads the application git repo into a known directory for bind-mount into
+       the builder gear container
+    2. The node fetches the deployment layer of the previous gear image by its id.
+    3. The node calculates which contents from the previous image should be used in the new container, and if necessary copies them into the container.
+    4. If the manifest defines a prepare command, starts the container with
+       `docker run -e <prepare cmd>`
+    3. If not, the node starts the container with `docker run`
+    4. The container code must decide whether to reuse the previously generated contents, or whether to continue without them (if a file listing dependencies has changed, new dependencies must be downloaded).
+    5. The node waits for the container to finish running, imposing a timeout
+    6. The node extracts from the container (method TBD) any necessary stateful information such as: environment
+       variables, cartridge hooks, dynamic network endpoints
+    7. The node performs a docker commit which creates the **deployment layer**
+    8. The node pushes the docker image to the application's private docker registry
+    9. The node reports the new deployment artifact (DA) id to the broker
+2. The broker creates a new (DA) record for the application
+3. The broker starts the deploy workflow
+
+
+#### Version upgrade
 
 A prepare may result in the version of a cartridge in use changing in the broker - it may have been
 input by the developer at build time.  An application may have multiple cartridge versions in
@@ -368,6 +409,7 @@ The scale up workflow is as follows:
     4. The node makes the gear routable on a node-level.
 2. The broker makes a call to the routing layer to route application requests to the new gear.
 
+
 ### Scale Down Workflow
 
 1. The broker makes a call to the routing later to disable routing application requests to the 
@@ -376,6 +418,7 @@ The scale up workflow is as follows:
     1.  The node gracefully stops the container
     2.  The node removes the node-level routing for the gear
     3.  The node removes any artifacts of process isolation for the gear
+
 
 ### Replace Workflow
 
@@ -393,6 +436,7 @@ There are several use-cases that replace has to support with need to be further 
 
 Docker currently doesn't directly support switching out an image for a process and starting another
 image with the same mounts / user / network bindings, but it has been requested.
+
 
 ## Upgrades
 
