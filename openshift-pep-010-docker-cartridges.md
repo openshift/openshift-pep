@@ -80,48 +80,95 @@ the contents of the prior image.
 
 ### What's in a deployment artifact (Docker layers)?
 
-                                            +--------------+
-                                            | Symlinks     |
-                                            | Built WAR    |  Deployment Layer
-                                            | User Source  |
-                        +--------------+    +--------------+
-                        | Scripts      |    | Scripts      |
-                        | JBoss        |    | JBoss        |
-                        | Maven        |    | Maven        |  Cartridge Layer
-                        | OpenJDK      |    | OpenJDK      |
-    +--------------+    +--------------+    +--------------+
-    | Libc / Bash  |    | Libc / Bash  |    | Libc / Bash  |  Base Layer
-    +--------------+    +--------------+    +--------------+
-
-    +--------------+    +--------------+    +--------------+
-    | Kernel       |    | Kernel       |    | Kernel       |
-    +--------------+    +--------------+    +--------------+
-
-    1. Base from CDN    2. Cartridge        3. Deployment
-                                               Artifact
 
 
-### Creating a deployment artifact (a gear image) flow
+                                                             +--------------+
+                                          +--------------+   | Symlinks     |  Deployment Layer
+                              Build Layer | Maven        |   | Built WAR    |
+                       +--------------+   +--------------+   +--------------+
+                       | Scripts      |   | Scripts      |   | Scripts      |  Cartridge Layer
+                       | JBoss        |   | JBoss        |   | JBoss        |
+    +--------------+   +--------------+   +--------------+   +--------------+
+    | Libc / Bash  |   | Libc / Bash  |   | Libc / Bash  |   | Libc / Bash  |  Base Layer
+    +--------------+   +--------------+   +--------------+   +--------------+
 
-         +--------------+    +------------+     +-------------+
-         | User Git     | OR | Binary     | AND | App         |
-         | repo tarball |    | (WAR, zip) |     | Environment |
-         +------+-------+    +------+-----+  +- +-------------+
-                |                   |        |
-                +---------------+   |    +---+  +--------------+
-                                |   |    |      | Symlinks     |
-                                |   |    |      | Built WAR    |
-                                |   |    |      | User Source  |
-    +--------------+            |   |    |      +--------------+
-    | Scripts      |            |   |    |      | Scripts      |
-    | JBoss        |            v   v    v      | JBoss        |
-    | Maven        +------> invoke prepare +--->| Maven        +---> save as new
-    | OpenJDK      |        script              | OpenJDK      |     image in Docker
+    +--------------+   +--------------+   +--------------+   +--------------+
+    | Kernel       |   | Kernel       |   | Kernel       |   | Kernel       |
+    +--------------+   +--------------+   +--------------+   +--------------+
+
+    1. Base from CDN   2. Cartridge       3. Build Image     4. Deployment
+                                                                Artifact
+
+### Creating a build image flow
+
+
+                         +----------------------+
+                         |  Cartridge Manifest  |
+                         +----------------------+
+                                    |
+                                    |
+                                    |
+                                    |
+                                    |
+                                    |           +--------------+
+                                    |           | Maven        |
+    +--------------+                v           +--------------+
+    | Scripts      |------> Add build deps +--->| Scripts      +---> save as new
+    | JBoss        |                            | JBoss        |     image in Docker
     +--------------+                            +--------------+
     | Libc / Bash  |                            | Libc / Bash  |
     +--------------+                            +--------------+
 
-    Cartridge Image                             Deployment Artifact
+    Cartridge Image                             Build Image
+
+
+### Creating a deployment artifact from user source flow
+
+
+                         +--------------+
+                         | User Git     |
+                         | repo tarball |
+                         +------+-------+
+                                |
+    +--------------+            |
+    | Maven        |            |
+    +--------------+            v               +--------------+
+    | Scripts      |------>   build   --------->| Built WAR    |
+    | JBoss        |                            +-------+------+
+    +--------------+                                    |
+    | Libc / Bash  |                                    |
+    +--------------+                                    |
+                                    +-------------------+
+    Build Image                     |
+                                    |               +--------------+
+                                    |               | Symlinks     |
+    +--------------+                v               | Built WAR    |
+    | Scripts      |------> create deployment +---->+--------------+
+    | JBoss        |        artifact                | Scripts      |
+    +--------------+                                | JBoss        |
+    | Libc / Bash  |                                +--------------+
+    +--------------+                                | Libc / Bash  |
+                                                    +--------------+
+    Cartridge Image
+
+### Creating a deployment artifact from binary flow
+
+
+                         +-------------------+
+                         | Binary            |
+                         | (WAR / Zip)       |
+                         +-------------------+
+                                   |               +-----------------+
+                                   |               | Symlinks        |
+   +--------------+                v               | Binary (WAR/Zip)|
+   | Scripts      |------> create deployment +---->+-----------------+----> save as new
+   | JBoss        |        artifact                | Scripts         |      image in docker
+   +--------------+                                | JBoss           |
+   | Libc / Bash  |                                +-----------------+
+   +--------------+                                | Libc / Bash     |
+                                                   +-----------------+
+   Cartridge Image
+                                                   Deployment Artifact
 
 
 In V2 scalable applications, haproxy gears were responsible for distributing repository content to 
