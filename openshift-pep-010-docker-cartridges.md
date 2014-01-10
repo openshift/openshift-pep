@@ -80,53 +80,101 @@ the contents of the prior image.
 
 ### What's in a deployment artifact (Docker layers)?
 
-                                            +--------------+
-                                            | Symlinks     |
-                                            | Built WAR    |  Deployment Layer
-                                            | User Source  |
-                        +--------------+    +--------------+
-                        | Scripts      |    | Scripts      |
-                        | JBoss        |    | JBoss        |
-                        | Maven        |    | Maven        |  Cartridge Layer
-                        | OpenJDK      |    | OpenJDK      |
-    +--------------+    +--------------+    +--------------+
-    | Libc / Bash  |    | Libc / Bash  |    | Libc / Bash  |  Base Layer
-    +--------------+    +--------------+    +--------------+
-
-    +--------------+    +--------------+    +--------------+
-    | Kernel       |    | Kernel       |    | Kernel       |
-    +--------------+    +--------------+    +--------------+
-
-    1. Base from CDN    2. Cartridge        3. Deployment
-                                               Artifact
 
 
-### Creating a deployment artifact (a gear image) flow
+                                                             +--------------+
+                                          +--------------+   | Symlinks     |  Deployment Layer
+                              Build Layer | Maven        |   | Built WAR    |
+                       +--------------+   +--------------+   +--------------+
+                       | Scripts      |   | Scripts      |   | Scripts      |  Cartridge Layer
+                       | JBoss        |   | JBoss        |   | JBoss        |
+    +--------------+   +--------------+   +--------------+   +--------------+
+    | Libc / Bash  |   | Libc / Bash  |   | Libc / Bash  |   | Libc / Bash  |  Base Layer
+    +--------------+   +--------------+   +--------------+   +--------------+
 
-         +--------------+    +------------+     +-------------+
-         | User Git     | OR | Binary     | AND | App         |
-         | repo tarball |    | (WAR, zip) |     | Environment |
-         +------+-------+    +------+-----+  +- +-------------+
-                |                   |        |
-                +---------------+   |    +---+  +--------------+
-                                |   |    |      | Symlinks     |
-                                |   |    |      | Built WAR    |
-                                |   |    |      | User Source  |
-    +--------------+            |   |    |      +--------------+
-    | Scripts      |            |   |    |      | Scripts      |
-    | JBoss        |            v   v    v      | JBoss        |
-    | Maven        +------> invoke prepare +--->| Maven        +---> save as new
-    | OpenJDK      |        script              | OpenJDK      |     image in Docker
+    +--------------+   +--------------+   +--------------+   +--------------+
+    | Kernel       |   | Kernel       |   | Kernel       |   | Kernel       |
+    +--------------+   +--------------+   +--------------+   +--------------+
+
+    1. Base from CDN   2. Cartridge       3. Build Image     4. Deployment
+                                                                Artifact
+
+### Creating a build image flow
+
+
+                         +----------------------+
+                         |  Cartridge Manifest  |
+                         +----------------------+
+                                    |
+                                    |
+                                    |
+                                    |
+                                    |
+                                    |           +--------------+
+                                    |           | Maven        |
+    +--------------+                v           +--------------+
+    | Scripts      |------> Add build deps +--->| Scripts      +---> save as new
+    | JBoss        |                            | JBoss        |     image in Docker
     +--------------+                            +--------------+
     | Libc / Bash  |                            | Libc / Bash  |
     +--------------+                            +--------------+
 
-    Cartridge Image                             Deployment Artifact
+    Cartridge Image                             Build Image
 
 
-The broker will manage which deployed artifact (DA) a gear is using, and instruct the nodes to scale
-up, scale down, or "replace" the running version of a gear.  We would no longer make changes inside
-a gear as a result of user operations.
+### Creating a deployment artifact from user source flow
+
+
+                         +--------------+
+                         | User Git     |
+                         | repo tarball |
+                         +------+-------+
+                                |
+    +--------------+            |
+    | Maven        |            |
+    +--------------+            v               +--------------+
+    | Scripts      |------>   build   --------->| Built WAR    |
+    | JBoss        |                            +-------+------+
+    +--------------+                                    |
+    | Libc / Bash  |                                    |
+    +--------------+                                    |
+                                    +-------------------+
+    Build Image                     |
+                                    |               +--------------+
+                                    |               | Symlinks     |
+    +--------------+                v               | Built WAR    |
+    | Scripts      |------> create deployment +---->+--------------+
+    | JBoss        |        artifact                | Scripts      |
+    +--------------+                                | JBoss        |
+    | Libc / Bash  |                                +--------------+
+    +--------------+                                | Libc / Bash  |
+                                                    +--------------+
+    Cartridge Image
+
+### Creating a deployment artifact from binary flow
+
+
+                         +-------------------+
+                         | Binary            |
+                         | (WAR / Zip)       |
+                         +-------------------+
+                                   |               +-----------------+
+                                   |               | Symlinks        |
+   +--------------+                v               | Binary (WAR/Zip)|
+   | Scripts      |------> create deployment +---->+-----------------+----> save as new
+   | JBoss        |        artifact                | Scripts         |      image in docker
+   +--------------+                                | JBoss           |
+   | Libc / Bash  |                                +-----------------+
+   +--------------+                                | Libc / Bash     |
+                                                   +-----------------+
+   Cartridge Image
+                                                   Deployment Artifact
+
+
+In V2 scalable applications, haproxy gears were responsible for distributing repository content to 
+the gears in the application. In contrast, for Docker-based applications, the broker will manage 
+which deployed artifact (DA) a gear is using. An auto scaling subsystem would make requests to the
+broker to scale up or down.
 
 Plugin cartridges are TBD, but they may be injected during the prepare step or bind mounted into the
 gear after launch.
@@ -138,8 +186,8 @@ provide additional functionality to allow incremental layer creation - reusing d
 dependencies and generated files from a previous image - in order to ensure security updates do not
 break user applications unintentionally.
 
-Docker images live in a registry backed by some persistent storage.  OpenShift would run at least 2
-registries - one for public images, and one for private images.  Public images would be where shared
+Docker images live in a registry backed by some persistent storage.  OpenShift would need a registry
+solution that allowed both public and private images. Public images would be where shared
 cartridges come from, but private images would be isolated per account (domain?) and not visible to
 others. The metadata describing cartridges would move to the broker, and be mediated via a set of
 APIs for administrators and users. Over time, OpenShift might expose access to the registries to
@@ -169,7 +217,7 @@ If gears are write-once, it would be better to force the choice of having state 
 explicit.  A large part of gear state today is the Git repository.  Moving the Git repository into
 its own container (but still distributed on nodes) would allow us to add additional semantics to
 those repositories while reusing existing concepts like SSH and cgroup limits.  OpenShift would
-invoke a plugin to create the repository gear on the appropriate node, and add a special API call
+invoke a plugin to create the repository container on the appropriate node, and add a special API call
 that the post-receive hook of the repository would use to notify OpenShift of a new commit.  The
 gear repo would have access to the user's public keys as they do today (potentially within a
 separate gear group).  During a prepare, OpenShift would extract the source for the application into
@@ -184,6 +232,8 @@ php-5.4 - where a user may start on one version of the technology and later want
 down) to a different compatible version.  The two cartridges have the same contract with the source
 code, but a developer would be able to choose that new cartridge version to apply on a given build.
 
+It is important to note that gears will still have ephemeral local storage for use in caching 
+scenarios.
 
 ### Container security
 
@@ -301,7 +351,7 @@ The basic app creation workflow is as follows:
    type
 3. The OpenShift broker creates a record for the new application
 4. The broker makes a call to a Docker node (an OpenShift node which is configured to support
-   Docker-based gears) to create a git gear, passing the template git repo URL
+   Docker-based gears) to create a source control container, passing the template git repo URL
     1. The node downloads the specified template repo
     2. The node creates a new git repository from the template content
 5. The broker starts the prepare workflow
