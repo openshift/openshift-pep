@@ -158,16 +158,16 @@ the contents of the prior image.
                          | Binary            |
                          | (WAR / Zip)       |
                          +-------------------+
-                                   |               +-----------------+
-                                   |               | Symlinks        |
-   +--------------+                v               | Binary (WAR/Zip)|
-   | Scripts      |------> create deployment +---->+-----------------+----> save as new
-   | JBoss        |        artifact                | Scripts         |      image in docker
-   +--------------+                                | JBoss           |
-   | Libc / Bash  |                                +-----------------+
-   +--------------+                                | Libc / Bash     |
-                                                   +-----------------+
-   Cartridge Image
+                                    |               +-----------------+
+                                    |               | Symlinks        |
+    +--------------+                v               | Binary (WAR/Zip)|
+    | Scripts      |------> create deployment +---->+-----------------+----> save as new
+    | JBoss        |        artifact                | Scripts         |      image in docker
+    +--------------+                                | JBoss           |
+    | Libc / Bash  |                                +-----------------+
+    +--------------+                                | Libc / Bash     |
+                                                    +-----------------+
+    Cartridge Image
                                                    Deployment Artifact
 
 
@@ -186,8 +186,8 @@ provide additional functionality to allow incremental layer creation - reusing d
 dependencies and generated files from a previous image - in order to ensure security updates do not
 break user applications unintentionally.
 
-Docker images live in a registry backed by some persistent storage.  OpenShift would need a registry
-solution that allowed both public and private images. Public images would be where shared
+Docker images live in a registry backed by some persistent storage.  OpenShift requires a registry
+solution that allows both public and private images. Public images would be where shared
 cartridges come from, but private images would be isolated per account (domain?) and not visible to
 others. The metadata describing cartridges would move to the broker, and be mediated via a set of
 APIs for administrators and users. Over time, OpenShift might expose access to the registries to
@@ -285,6 +285,30 @@ the scenarios described below where possible:
 
 As a cartridge author, information about how a cartridge logs should be exposed via the manifest,
 and OpenShift would delegate that information as necessary to integrators.
+
+
+### Downloadable Cartridges
+
+A downloadable V2 cart is a manifest that links to a source URL.  The Docker manifest should be a
+superset of a dockerfile, which means that a user can specify a dockerfile as input to creating an
+app, and that dockerfile will become a downloadable cart for the app.  When prepare happens for that
+gear, we can easily build their custom cartridge as a base layer, then run prepare on top of it.  On
+subsequent builds, the base cartridge could be refreshed (via a different mechanism probably) which
+triggers a build.
+
+
+### Moving HAProxy out of Gears
+
+HAProxy within web gears complicates a number of processes.  For Docker, we should investigate the
+creation and adoption of a routing layer to take edge traffic and route to gear groups based on
+endpoint data the broker has been made aware of.  We will also investigate the ability to deploy
+HAProxy gears within the application as a separate gear group.
+
+At a routing level, a further topic of investigation is the separation of traffic into low-volume
+/high-rate-of-change frontends, and high-volume/low-rate-of-change frontends.  Different
+technologies might be chosen for each which would allow new applications to go into the low-volume
+pool, and then moved into the high-volume pool via a DNS migration as an automated or administrative
+process.
 
 
 Specification
@@ -503,30 +527,6 @@ To upgrade a Docker gear (when a security update is released to a package):
 
 Plugin cartridges may complicate this story, and user installed packages complicate it further.  We
 may need a mechanism for categorizing gears into a searchable repo for packages.
-
-
-### Downloadable Cartridges
-
-A downloadable V2 cart is a manifest that links to a source URL.  The Docker manifest should be a
-superset of a dockerfile, which means that a user can specify a dockerfile as input to creating an
-app, and that dockerfile will become a downloadable cart for the app.  When prepare happens for that
-gear, we can easily build their custom cartridge as a base layer, then run prepare on top of it.  On
-subsequent builds, the base cartridge could be refreshed (via a different mechanism probably) which
-triggers a build.
-
-
-### Moving HAProxy out of Gears
-
-HAProxy within web gears complicates a number of processes.  For Docker, we should investigate the
-creation and adoption of a routing layer to take edge traffic and route to gear groups based on
-endpoint data the broker has been made aware of.  We will also investigate the ability to deploy
-HAProxy gears within the application as a separate gear group.
-
-At a routing level, a further topic of investigation is the separation of traffic into low-volume
-/high-rate-of-change frontends, and high-volume/low-rate-of-change frontends.  Different
-technologies might be chosen for each which would allow new applications to go into the low-volume
-pool, and then moved into the high-volume pool via a DNS migration as an automated or administrative
-process.
 
 
 Additional Topics
