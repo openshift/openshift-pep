@@ -1,5 +1,5 @@
 PEP: 009  
-Title: Standardized conventions for logging, log rotation, & aggregation
+Title: Standardized conventions for logging and aggregation
 Status: draft  
 Author: Brenton Leanhardt <bleanhar@redhat.com>, Andy Goldstein <agoldste@redhat.com>, Dan Mace <dmace@redhat.com>, Julian Prokay <jprokay@redhat.com>  
 Arch Priority: medium  
@@ -11,7 +11,7 @@ Epic: *url to a story, wiki page, or doc*
 
 Abstract
 --------
-Standardize conventions for logging in OpenShift to make it easier for users and system administrators to access logs in a consistent manner. Begin to provide support for external aggregation of log messages. Provide a means to perform log rotation for OpenShift environments that write log files to disk.
+Standardize conventions for logging in OpenShift to make it easier for users and system administrators to access logs in a consistent manner. Begin to provide support for external aggregation of log messages.
 
 Motivation
 ----------
@@ -20,9 +20,6 @@ Today, log messages related to OpenShift are placed in a variety of different lo
 Having a large number of log files spread across multiple locations makes logging aggregation difficult. Aggregation would be much simpler if all the log messages had the ability to go through a single logging transport. Syslog is a good choice for this role because it is or can be supported by all of the OpenShift components with minimal effort. Additionally, most Syslog implementations are configurable, meaning that the administrator can choose to write logs to disk, forward logs to an aggregation server, etc.
 
 Today, log files in a gear are generally located in a subdirectory in each cartridge's directory. For example, if a gear has both the Ruby and Postgres cartridges installed, logs for Ruby would be in `$OPENSHIFT_HOMEDIR/ruby/logs` and logs for Postgres would be in `$OPENSHIFT_HOMEDIR/postgresql/logs`. It would be nice if all of these log files could be consolidated to a single location within the gear, such as `$OPENSHIFT_DATA_DIR/logs`.
-
-For application developers, there is also a tactical need for log rotation. Currently, to avoid log files growing so large that they consume all of a gear's disk quota (thus leading to a localized gear outage), developers must execute the `tidy` operation on their applications. The behavior of this operation is cartridge-specific, and often results in log files being deleted entirely, instead of using rotation. In some cases, OpenShift administrator assistance may be required to unwedge such a gear.
-
 
 Specification
 -------------
@@ -92,13 +89,6 @@ Fortunately, when communicating with Syslog via the Unix datagram socket, Syslog
 ### Node Apache access log changes
 Incoming HTTP requests first arrive at Apache running on a node and are then proxied to the appropriate gear to handle the request. The node Apache access should be augmented to include additional OpenShift metadata (app uuid, gear uuid) to aid in correlation/aggregation of access log messages.
 
-
-### Log rotation
-Log rotation of OpenShift platform log files (all log files listed above **excluding** gear and cartridge logs) is not in scope for this PEP. The platform log files are all items that a system administrator can easily configure for log rotation using `logrotate` or some other means for log rotation.
-
-Log rotation of gear and cartridge logs is in scope for this PEP, time permitting.
-
-TODO...
 
 Backwards Compatibility
 -----------------------
