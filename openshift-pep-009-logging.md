@@ -96,7 +96,9 @@ If Syslog is enabled for the platform, OpenShift system log messages will go to 
 
 If Syslog is enabled for gears, cartridge and application log messages will **only** be delivered to Syslog, meaning they will no longer be written to log files inside each gear. Additionally, `rhc tail` will no longer work because it requires access to the log files on disk.
 
-Otherwise, if Syslog is not enabled for gears, cartridge and application log messages will continue to be written to disk as they are today, but log files all be placed in `$OPENSHIFT_DATA_DIR/logs` instead of spread across multiple cartridge directories.
+Otherwise, if Syslog is not enabled for gears, cartridge and application log messages will continue to be written to disk, with the following differences from today's system:
+* Logs will all be placed in `$OPENSHIFT_DATA_DIR/logs` instead of spread across multiple cartridge directories.
+* Log messages are consolidated *per cartridge* and written to a single file for that cartridge within the gear. In some cases, this will result in one file where previously there were many. The logs from separate sources within the cartridge will be interlaced within a single file. Each log entry will contain the context necessary to separate the lines in a downstream tool.
 
 If the node Apache access log (openshift_log) is not written to a file in its current format, tools such as `oo-last-access` will not be able to function, meaning that gear idling will not work any more, as determining if a gear is idle currently depends on openshift_log.
 
