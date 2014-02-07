@@ -29,40 +29,41 @@ Specification
 ### Syslog Enablement
 Via configuration, a system administrator can instruct OpenShift to log to Syslog instead of to files.
 
-**SYSLOG_ENABLED**  
-If set to true, enables writing platform log messages to Syslog instead of to files. This option does not apply to gears and cartridges. Enabling this option would result in log messages no longer being written to the following log files:
+**Platform Components**  
+The following platform components may be configured to write log messages to Syslog instead of to the given files:
 
 - Broker
-	- /var/log/openshift/broker/production.log
-	- /var/log/openshift/broker/usage.log
-	- /var/log/openshift/broker/user_action.log
+	- `/var/log/openshift/broker/production.log`
+	- `/var/log/openshift/broker/usage.log`
+	- `/var/log/openshift/broker/user_action.log`
 - Node
-	- /var/log/openshift/node/platform.log
-	- /var/log/openshift/node/platform-trace.log
+	- `/var/log/openshift/node/platform.log`
+	- `/var/log/openshift/node/platform-trace.log`
 - Site
-	- /var/log/openshift/site/production.log
+	- `/var/log/openshift/site/production.log`
 - Console
-	- /var/log/openshift/console/production.log
+	- `/var/log/openshift/console/production.log`
+- Frontend Apache (Gear access logging)
+  - `/var/log/httpd/openshift_log`
 
-**GEAR_SYSLOG_ENABLED**  
-If set to true, enables writing gear and cartridge log messages to Syslog instead of to files.
+**Gears and Cartridges**  
+Gear and cartridge log messages may be directed to Syslog by setting the `GEAR_SYSLOG_ENABLED` configuration key to `true` in `node.conf`.
 
-**Other log files**  
+**Other Components**  
 Some log files will not be controlled by the configuration options listed above and instead must be configured independently/elsewhere:
 
 - Broker
-	- /var/log/openshift/broker/ruby193-mcollective-client.log
-	- /var/log/openshift/broker/httpd/access_log
-	- /var/log/openshift/broker/httpd/error_log
+	- `/var/log/openshift/broker/ruby193-mcollective-client.log`
+	- `/var/log/openshift/broker/httpd/access_log`
+	- `/var/log/openshift/broker/httpd/error_log`
 - Node
-	- /var/log/ruby193-mcollective.log
-	- /var/log/httpd/openshift_log
+	- `/var/log/ruby193-mcollective.log`
 - Site
-	- /var/log/openshift/site/httpd/access_log
-	- /var/log/openshift/site/httpd/error_log
+	- `/var/log/openshift/site/httpd/access_log`
+	- `/var/log/openshift/site/httpd/error_log`
 - Console
-	- /var/log/openshift/console/httpd/access_log
-	- /var/log/openshift/console/httpd/error_log
+	- `/var/log/openshift/console/httpd/access_log`
+	- `/var/log/openshift/console/httpd/error_log`
 
 
 ### Using stdout and stderr for logging
