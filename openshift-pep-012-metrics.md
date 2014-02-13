@@ -4,8 +4,8 @@ Status: draft
 Author: Andy Goldstein <agoldste@redhat.com>, Dan Mace <dmace@redhat.com>,  
 Julian Prokay <jprokay@redhat.com>, Teddy Funger <tfunger@redhat.com>  
 Arch Priority: medium  
-Complexity:  30, 13 *story points*  
-Affected Components: node, cartridges  
+Complexity:  Cartridge 30, Node 13 *story points*  
+Affected Components: cartridges, node  
 Affected Teams: Cartridge (2), Node (2)  
 User Impact: low  
 Epic:    
