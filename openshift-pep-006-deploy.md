@@ -480,11 +480,13 @@ The minimum deployment time for scale-replace is described by
 
 where N(gears) is the number of gears in the application, N(extra_cap) is the extra capacity in number of gears, T(gear_create) is the time to create a new gear with an instance of the cartridges, T(gear_deploy) is the time to copy the deployment artifact onto disk from the source, and T(gear_activate) is the time to swap the artifact to the newly deployed version and start the gear.
 
-The minimum deployment time for in-place is:
+The minimum deployment time for in-place is (because gear_deploy can be executed before the deployment begins):
 
     T(deploy) = ( N(gears) / ( N(extra_cap) + N(fraction) ) - 1 ) * ( T(gear_activate) )
 
-because gear_deploy can be executed before the deployment begins.  There is no combination of factors where scale-replace is faster than in-place.
+Where N(fraction) = N(gears) * number of gears that are allowed to be down at any given point in time. For example, there are 10 gears and only 1 gear is allowed to be down at a time. As such, there will be (10 / (0 + (10*.1)) – 1 * activate time == 9 * activate time.
+
+There is no combination of factors where scale-replace is faster than in-place.
 
 Some large installations may not have access to sufficient floating capacity to accomplish their update within specific time constraints - they will wish to trade increased disk usage for increased speed / decreased overall deployment time.  Some users will wish to try simple deploys with limited disk space - that can be accomplished with scale-replace.
 
