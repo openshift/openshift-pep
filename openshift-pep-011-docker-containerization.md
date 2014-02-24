@@ -141,11 +141,11 @@ Currently the broker assign a UID to a gear and the 127.x.x.* ip range and exter
 
 	1. Each LibVirt container will be assigned a 172.x.x.x NAT'd address based on its UID
 	
-	2. Within the container the conatiner will have 127.*.*.* network space and cartridges will bind to these addresses.
+	2. Within the container the container will have 127.*.*.* network space and cartridges will bind to these addresses.
 	
 	3. IPTables will be used to port-forward the 127.x.x.x address to the container external 172.x.x.x address.
 	
-	4. IPTables/FirewallD will be used to port-forward the 172.x.x.x conatiner address to an node external IP.
+	4. IPTables/FirewallD will be used to port-forward the 172.x.x.x container address to an node external IP.
 	
 	5. When gears are moved, their internal 127.*.*.* IP space will not change. The 172.x.x.x address and the externally
 	   proxied ports will change. Connection hooks will be re-executed to reconnect services.
