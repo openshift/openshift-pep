@@ -20,7 +20,7 @@ Motivation
 ----------
 Metrics provide important insight into the performance of a system and environment. These metrics can be used for auditing purposes or to ensure that services are allocated an appropriate amount of resources (performance tuning). In addition, metrics can be used by monitoring services to generate alerts and for performance monitoring.
 
-OpenShift is a complex system comprised of many independent components that, when combined, make up one or more user applications. System administrators and application owners need a complete picture of the technical inner workings and statistics of all of these components as a whole to have a complete picture of how the application functions as a unit. The following is an example of the types of information that chould be aggregated and correlated to provide that holistic view:
+OpenShift is a complex system comprised of many independent components that, when combined, make up one or more user applications. System administrators and application owners need a complete picture of the technical inner workings and statistics of all of these components as a whole to have a complete picture of how the application functions as a unit. The following is an example of the types of information that could be aggregated and correlated to provide that holistic view:
 
 - Gear metrics
 	- cgroups data
@@ -31,8 +31,8 @@ OpenShift is a complex system comprised of many independent components that, whe
 - Cartridge metrics
 	- HAProxy statistics
 	- Apache statistics
-	- JVM data (thread count, heap memoory information)
-- Applicaition metrics
+	- JVM data (thread count, heap memory information)
+- Application metrics
 	- specific to each application
 
 Specification
@@ -72,7 +72,7 @@ A cartridge author must include a `Metrics` entry in the cartridge's `manifest.y
 
 where each element specifies the name of a metric that the cartridge will be reporting.
 
-Ulitmately, the structure may evolve to include additional metadata about the metrics, such as:
+Ultimately, the structure may evolve to include additional metadata about the metrics, such as:
 
 	Metrics:
 		thread.count:
