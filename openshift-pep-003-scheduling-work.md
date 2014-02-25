@@ -126,7 +126,7 @@ A separate trello card already exists to capture the details of this effort: htt
    + the actual delay for a particular retry attempt will be the retry delay multiplied by the retry attempt
    + delay = retry_delay * retry_count (retry attempts already made)
  + The retry_count for the sub-ops will be incremented to indicate the number of retries already performed
- + Each sub-op will specify its re-execution requiremcents, and they could be one of the following:
+ + Each sub-op will specify its re-execution requirements, and they could be one of the following:
    + it could be re-executed/retried as-is without worrying about the state of the previous attempt
    + it could specify that the failed sub-op be first rolledback before retrying it
    + it could specify a list of earlier sub-ops (an array of sub-op IDs) that will need to be rolled back (along with any sub-ops that depend on them) before they can all be re-attempted

@@ -104,7 +104,7 @@ In this hypothetical configuration, proxy 1 and proxy 2 are both configured to v
 
 This PEP interacts with the deploy/zero-downtime PEP and the Geo PEP.  This PEP does not attempt to define the following topics:
 
-*  TCP load balancing within OpenShift applications or at the infrastructure level.  It is assmued that external TCP balancing will require public ports to be exposed, and also must define how the endpoints are described to clients.  The routing SPI and the REST API will be built to support the possibility of TCP load balancing.
+*  TCP load balancing within OpenShift applications or at the infrastructure level.  It is assumed that external TCP balancing will require public ports to be exposed, and also must define how the endpoints are described to clients.  The routing SPI and the REST API will be built to support the possibility of TCP load balancing.
 *  Multi-master / failover for pushes/build/deployments (covered by zero-downtime PEP)
 *  Websocket support, although it is assumed that web sockets can be load balanced and proxied in a similar fashion to HTTP edge traffic.
 
