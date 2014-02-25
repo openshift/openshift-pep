@@ -37,15 +37,15 @@ The Origin VM completes its boot-up procedure by invoking [oo-login#login()](htt
 
     OpenShift Installer
     ----------------
-    
+
     OpenShift console: https://broker.openshift.local/console
     Console login:     admin
     Console password:  admin
-    
+
     IP address: X.X.X.X
     SSH user:   openshift
     Password:   openshift
-    
+
     Press any key for root console
 
 This utility will be replaced with a general-purpose package that can provide the additional user interaction that is described in this document. The expanded utility will be called `oo-install` and will function both within the context of the Origin VM and in a standalone capacity for use with other OpenShift distros.
@@ -54,16 +54,16 @@ The new installer will begin with an intro screen that summarizes the user's opt
 
     OpenShift Installer
     ----------------
-    
+
     Welcome to OpenShift.
-    
+
     This VM is currently running a complete OpenShift installation.
     You can connect to it by pointing your browser to:
-    
+
     https://broker.openshift.local/console
-    
+
     To do more with this VM, select from the following options:
-    
+
     <1> Use this VM in a multi-instance deployment
     <2> Install OpenShift on another system
     <3> Download Puppet templates
@@ -218,13 +218,13 @@ The goal of this Workflow is to make it possible for a user to set up an entire 
 
     OpenShift Installer: Multi-Instance Deployment
     ----------------------------------------------
-    
+
     What role should this VM fill in the Origin system?    
     <1> Database server	
     <2> Message queueing server
     <3> Broker
     <4> Node
-    
+
     <esc> - Go to main menu
 
 Once a user selects the role for this VM, the installer calls the Workflow Executable to configure the current Origin VM instance.
@@ -233,13 +233,13 @@ Once a user selects the role for this VM, the installer calls the Workflow Execu
 This Workflow causes the Installer to copy data over to a target host and then configure that host to act as one of the [Simplified Deployment Roles](#simplified-deployment-roles) as specified in the [Deployment section](#default-configuration) of the installer configuration.
 
     OpenShift Installer: Remote System Setup
-    
+
     Which role do you want to deploy?  
     <1> Database server  
     <2> Message queueing server  
     <3> Broker  
     <4> Node  
-    
+
     <return> - Continue  
     <esc> - Go to main menu  
 
@@ -251,13 +251,13 @@ When the target host is identified, the installer will attempt to connect to the
 This Workflow is almost identical to the [remote system installation](#workflow-install-a-role-on-a-remote-system), however, it does not require SSH access to any other system. The user indicates the Role that the current system should assume, and the [Workflow Executable](#executable) performs the necessary work on the local system to establish it in the overall OpenShift system.
 
     OpenShift Installer: Local System Setup
-    
+
     Which role do you want to deploy?  
     <1> Database server  
     <2> Message queueing server  
     <3> Broker  
     <4> Node  
-    
+
     <return> - Continue  
     <esc> - Go to main menu  
 
@@ -268,15 +268,15 @@ This workflow exists simply to call attention to the various ways that users can
 
     OpenShift Installer: Puppet Templates Download
     ----------------------------------------------
-    
+
     The templates that are packaged with this Origin VM are located at:
-    
+
         /root/puppet_templates.zip
-    
+
     The latest versions of the puppet templates are always available on GitHub:
-    
+
         https://github.com/openshift/puppet-openshift_origin
-    
+
     <esc> - Go to main menu
 
 The only technical requirement for Origin is that the VM packager will need to be instrumented to create and place the zip file referenced in the installer.
@@ -286,13 +286,13 @@ _(Origin VM only)_ This workflow simply displays the login information that the 
 
     OpenShift Origin VM Login Details
     ---------------------------------
-    
+
     To connect to this Origin VM, use the following information:
-    
+
     OpenShift console: https://broker.openshift.local/console
     Console login:     admin
     Console password:  admin
-    
+
     IP address: X.X.X.X
     SSH user:   openshift
     Password:   openshift

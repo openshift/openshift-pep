@@ -124,7 +124,7 @@ The following directory structure is proposed:
           id
           state
         repo/
-        
+
       2013-08-16_18-12-15.746/
         dependencies/
         metadata/
@@ -132,15 +132,15 @@ The following directory structure is proposed:
           id
           state
         repo/
-        
+
       by-id
         fa93c9b -> ../2013-08-16_14-36-36.881
         9191a7e -> ../2013-08-16_18-12-15.746
-        
+
     app-archives/
       myapp-1.0.tar.gz
       myapp-2.0.tar.gz
-      
+
     app-root/
       dependencies -> runtime/dependencies
       repo -> runtime/repo

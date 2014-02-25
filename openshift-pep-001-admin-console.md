@@ -14,7 +14,7 @@ Abstract
 Create a server component that can provide visualization and information retrieval to an admin running an OpenShift deployment.  The component must:
 
 * Be independent from the broker so that it can be network routed or secured appropriately
-* Provide simple logical visualization of the nodes, districts, and gears within an openshift deployment so that an admin can get a quick-glance capacity overview
+* Provide simple logical visualization of the nodes, districts, and gears within an OpenShift deployment so that an admin can get a quick-glance capacity overview
 * Allow administrators to perform specific task focused information retrieval jobs easily
 * Be based on the core broker model objects to insulate from maintenance costs associated with data model changes, and provide reusable pieces of query / format code for CLI or shell based interaction in the future
 * Use technologies that are already in use within the OpenShift stack
