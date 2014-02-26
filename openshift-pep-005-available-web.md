@@ -130,11 +130,11 @@ OpenShift will reliably distribute notifications of the following changes to app
 *  Addition/removal/changes to SSL certs of aliases from an application
 
    An alias is an external route - the mapping between the alias DNS and the application DNS must be known to a routing implementor.  Sends the alias+port and the underlying DNS address+port it should map to.
-   
+
 *  Addition/removal of geography changes to an application
 
    A geo (see [Geo PEP 004](https://github.com/openshift/openshift-pep/blob/master/openshift-pep-004.md)) may convey information about the placement of an application.  Sends the application DNS, the Geo, and the application id
-   
+
 *  Changes to the stop/start/rotate-in/rotate-out status of an application or gear
 
    When components within OpenShift request changes to the running status of a gear or application or whether traffic flows to items in that app.  Sends a list of affected dns + port entries and the types of traffic.
