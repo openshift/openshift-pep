@@ -150,8 +150,6 @@ The following directory structure is proposed:
 
 The **app-deployments** directory contains 1 or more deployments in their entirety. A deployment directory name has the following format: [date]_[time], such as `2013-08-16_14-36-36.881`.  The repo directory contains the contents of what will be in app-root/runtime/repo. The dependencies directory contains the contents of app-root/runtime/dependencies. The metadata directory contains information about the deployment: the git ref of the deployment (if applicable), the deployment id, and the deployment's state (N/A or DEPLOYED).
 
-**app-root/runtime/repo** moves from being a standalone directory to a symlink that points at the active deployment in the deployments directory.
-
 The **app-archives** directory contains binary deployment artifacts that are the inputs to the `prepare` platform action.
 
 ### Git deployments - current OpenShift workflow
@@ -303,7 +301,7 @@ Inputs:
 
 Outputs:
 
-1.  Combined output of all actions as a String (TODO: refactor)
+1.  Combined output of all actions as a String
 
 Effects:
 
@@ -326,7 +324,7 @@ Inputs:
 
 Outputs:
 
-1.  Combined output of all actions as a String (TODO: refactor)
+1.  Combined output of all actions as a String
 
 Effects:
 
@@ -470,7 +468,7 @@ In addition, users may desire to deploy using two distinct methods:
 
 2.  **In-place**
 
-    Change gears in place, with or without altering the scale factor.  Predeploys the new deployment artifact to a temporary location, stops the gear, symlinks the new artifact to become the active deployment, and the starts the gear.
+    Change gears in place, with or without altering the scale factor.  Predeploys the new deployment artifact to a temporary location, stops the gear, copies the new artifact to become the active deployment, and the starts the gear.
 
 A concrete limitation of scale-replace is that the head gear in non HA applications must still be updated at low scale factors (N<3) via an in-place deploy (since the head gear cannot be scaled).  An advantage of the scale-replace is that it forces stateless gears and ensures movement across nodes of active content (beneficial for load balancing).  A downside is that gears are always cold.
 
