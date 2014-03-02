@@ -359,7 +359,7 @@ Backwards Compatibility
 
 * No backward incompatible API changes are planned.  All APIs and SPIs are new.
 * The routers and the routing SPI operate independently of the nodes.
-* An existing application can continue to serve traffic to its original DNS entry, and can configure it's aliases to point to the HA layer as necessary.
+* An existing application can continue to serve traffic to its original DNS entry, and can configure its aliases to point to the HA layer as necessary.
 
 
 Rationale

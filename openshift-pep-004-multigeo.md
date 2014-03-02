@@ -52,7 +52,7 @@ Considerations explicitly excluded for a future version:
 Implementation Details
 ----------------------
 * If we do not choose subcollectives: Every geo will have a /etc/mcollective/client.cfg file called $GEO.cfg.  So, for example if we have a us1 and a au1 geo, we would have a us1.cfg and an au1.cfg file
-* If we do choose subcollectives: Every geo will have it's own filter id and mcollective will communicate directly with that geo via it's id.
+* If we do choose subcollectives: Every geo will have its own filter id and mcollective will communicate directly with that geo via its id.
 * Geo's should be added to the broker.conf file as a GEO_LIST variable similar to how the mongo brokers are listed.  The geo's listed in that variable match to a $GEO.cfg as listed above.
 * Admins can specify the default geo via the DEFAULT_GEO variable in broker.conf
 * Users, via the command line tooling and UI could specify what GEO to use via the broker API.  If no GEO was specified the admins could decide what GEO to use.
