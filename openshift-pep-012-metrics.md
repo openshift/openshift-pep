@@ -40,26 +40,26 @@ Specification
 ### Metrics Collection
 Metrics will be collected using a hybrid push/pull model, with both methods being supported options. In some cases, there may be too much overhead (time and/or resources) to spawn an external process to gather metrics, while in others it may be entirely acceptable.
 
-In both cases, the act of reporting metrics to OpenShift is as simple as writing them to `STDOUT` using the metrics message format defined below. If cartridge and application developers write their metrics to `STDOUT`, those metrics will be captured by OpenShift and either written to Syslog or to log files in $OPENSHIFT_DATA_DIR/logs, depending on the OpenShift environment's configuration (see the [Logging PEP](https://github.com/openshift/openshift-pep/blob/master/openshift-pep-009-logging.md) for more details).
+In both cases, the act of reporting metrics to OpenShift is as simple as writing them to either `STDOUT` or `Syslog` using the metrics message format defined below. If cartridge and application developers write their metrics to `STDOUT`, those metrics will be captured by OpenShift and either written to Syslog or to log files within the gear, depending on the OpenShift environment's configuration (see the [Logging PEP](https://github.com/openshift/openshift-pep/blob/master/openshift-pep-009-logging.md) for more details).
 
 #### Pulling metrics
-A node-level service, `oo-gather-metrics`, is responsible for scheduling the pull-based metrics available per gear. The daemon will also be responsible for reporting statistics about the metrics gathering process, such as the time taken to gather metrics.
+A new Watchman plugin is responsible for scheduling the pull-based metrics available per gear. It will also be responsible for reporting statistics about the metrics gathering process, such as the time taken to gather metrics.
 
-`oo-gather-metrics` will query each gear for metrics at a configurable interval. During each iteration, it will perform the following tasks:
+The Watchman plugin will query each gear for metrics at a configurable interval. During each iteration, it will perform the following tasks:
 
 - collect metrics common to all gears such as cgroups information
-- execute `bin/control metrics` for each cartridge whose manifest indicates the cartridge supports metrics
-- execute the application's `metrics` action hook (if preset) to allow the application to report its metrics
+- execute `bin/metrics` for each cartridge whose manifest indicates the cartridge supports metrics
+- execute the application's `metrics` action hook (if present) to allow the application to report its metrics
 
-Metrics reported via `bin/control metrics` and the `metrics` action hook must be printed to `STDOUT`, as OpenShift will handle delivering the metrics to the appropriate destination (Syslog or log files).
+Metrics reported via `bin/metrics` and the `metrics` action hook must be printed to either `STDOUT` or `Syslog`.
 
 Because an OpenShift node may have dozens or hundreds of gears, it is imperative that metrics collection complete as quickly as possible, using as few resources as possible so as to minimize the potential impact to the normal execution of each gear's processes. Cartridge and application metrics may be time limited, and metrics gathering processes that exceed their allocated time may be terminated.
 
 
 #### Pushing metrics
-A cartridge or application author can opt to schedule metrics reporting on their own, instead of relying on `oo-gather-metrics` to do so. 
+A cartridge or application author can opt to schedule metrics reporting on their own, instead of relying on the Watchman plugin to do so. 
 
-Metrics must be printed to `STDOUT` and OpenShift will handle delivering them to the appropriate destination (Syslog or log files).
+Push metrics must be printed to either `STDOUT` or `Syslog`.
 
 
 ### Cartridge manifest changes
@@ -83,7 +83,7 @@ Additional tooling in the future may be able to take advantage of the metadata i
 
 
 ### Message format
-A metrics message must include the following fields (order does not matter):
+A metrics message must include the following fields:
 
 - `type=metric`
 - `<metric name>=<metric value>`
