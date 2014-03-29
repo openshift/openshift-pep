@@ -114,7 +114,7 @@ A separate trello card already exists to capture the details of this effort: htt
  + Workers will be resilient and will keep retrying connection to the scheduler 
 
 ##### What happens if worker process dies?
- + A moritoring script/utility (will be created) to re-spawn workers
+ + A monitoring script/utility (will be created) to re-spawn workers
  + The in-progress pending op will be placed back in the queue after the job timeout
  + In order to prevent requiring a large job timeout, the worker will frequently "touch" the job to renew the timeout (after every sub-op completion)
 

@@ -65,7 +65,7 @@ platform and cartridge code. High level design goals:
   1. Gear-level operations are implemented in the node platform code not the cartridge
   2. Cartridge code is driven by node platform code
   3. Cartridge code uses convention not configuration
-  4. env variables will continue to be the method of communication between
+  4. Environment variables will continue to be the method of communication between
      cartridges and gears, and other cartridges
 
 See [How To Write An OpenShift Origin Cartridge 2.0](https://github.com/openshift/origin-server/blob/master/node/README.writing_cartridges.md)
@@ -98,16 +98,16 @@ Migration work flow:
   5. Remove old cartridge instance
 
 Migration Concerns:
-  1. Moving env variables to cartridge dependent directories may effect
+  1. Moving environment variables to cartridge dependent directories may effect
      applications if they are reading from the disk rather than
      the process environment.
        a. Node platform code will be modified to gather all the cartridge
-          segregated env variables in one process space when calling new
+          segregated environment variables in one process space when calling new
           cartridge scripts..
 
   2. It will overly complicate the migration if the version of the
      software controlled by the old cartridge is different than the new
-     cartridge. This is not the time to look for a quickie upgrades.
+     cartridge. This is not the time to look for a quick upgrade.
 
   3. The creation of additional cartridges will also impact the amount
      migration work.
