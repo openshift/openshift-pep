@@ -57,7 +57,7 @@ software depends on.
 
 The following is a list of goals, in descending order:
 
-1. Achieve a very high **density** of containers. In the order of 1,000 or more active small gears per EC2 m2.4xlarge host, plus approx. 10,000 idle containers.
+1. Achieve a very high **density** of containers. In the order of 400 or more active small gears per EC2 m3.2xlarge host, plus approx. 8,000 idle containers.
 
 2. Minimal additional resource **overhead** as compared to current OpenShift isolation
 
