@@ -1,7 +1,7 @@
 PEP: 3  
 Title: Scheduling of Broker Jobs  
 Status: reviewed  
-Author: Dan McPherson <dmcphers@redhat.com>, Abhishek Gupta <abhgupta@redhat.com>, Jordan Liggitt <jliggitt@redhat.com> 
+Author: Dan McPherson <dmcphers@redhat.com>, Abhishek Gupta <abhgupta@redhat.com>, Jordan Liggitt <jliggitt@redhat.com>  
 Arch Priority: medium  
 Complexity: 100  
 Affected Components: web, api, broker, cli  
