@@ -1,7 +1,7 @@
 PEP: 010  
 Title: Cartridge V3 and Docker Containers  
 Status: draft  
-Author: Clayton Coleman <ccoleman@redhat.com>, Paul Morie <pmorie@redhat.com>  
+Author: Clayton Coleman <ccoleman@redhat.com>, Paul Morie <pmorie@redhat.com>, Ben Parees <bparees@redhat.com>  
 Arch Priority: high  
 Complexity: 200  
 Affected Components: web, api, runtime, cartridges, broker, admin_tools, cli  
@@ -28,22 +28,18 @@ enable more controlled upgrades, deployments, and version to version changes.
 
 This PEP depends on and modifies [PEP 002: Cartridges
 V2](https://github.com/openshift/openshift-pep/blob/master/openshift-pep-002-cartridge-v2.md).
-It defines the use cases which [PEP 011: Docker
-containerization](https://github.com/openshift/openshift-pep/blob/master/openshift-pep-010-docker-cartridges.md)
-must address from a technical standpoint.
-
 
 Background
 ----------
 
-We hope to leverage the full capabilities of the Docker container, while working with the OpenStack
-Solum project to evolve a new public standard that benefits developers and operators in the public
-cloud.  We should take into account the limitations of the current mutable gear model and look for
-opportunities to isolate components further (gears don't change, source code split out into its own
-locations, routing moves out of gears and nodes).
+We hope to leverage the full capabilities of the Docker container to evolve a new public standard 
+that benefits developers and operators in the public cloud.  We should take into account the 
+limitations of the current mutable gear model and look for opportunities to isolate components 
+further (gears don't change, source code split out into its own locations, routing moves out of gears 
+and nodes).
 
 A key design goal is to reduce the changes that occur inside of a gear after it is created - in
-theory, reduce the changes to solely user application state, vs cartridge or gear state.
+theory, reduce the changes to solely user application state, rather than cartridge or gear state.
 
 Core Concepts
 -------------
@@ -63,112 +59,127 @@ scale up, without any communication required between gears.  Any change to a gea
 which means that a single process is responsible for user code changes, security updates, and
 cartridge version changes.
 
-An OpenShift cartridge is metadata that describes the capabilities of a set of software - likewise,
-a Dockerfile is metadata describing how to prepare a set of software for use in an image.  In
-OpenShift, we would treat the base Dockerfile elements - BASE, RUN, and EXECUTE - as new additions
-to the cartridge manifest, and we would map the remaining metadata to existing OpenShift elements.
+An OpenShift v2 cartridge is metadata that describes the capabilities of a set of software - likewise,
+a Dockerfile is metadata describing how to prepare a set of software for use in an image.  
 
-A Docker cartridge is a Docker image, with a set of metadata (a manifest) that can be translated to
-a Dockerfile for execution during a build.  The Docker manifest adds additional elements to handle
-the execution of steps and a RUN command.  V2 cartridges will have default values for these
-(bin/setup and bin/control start).  The act of transforming a cartridge image with cartridge hooks
-and/or source and build will be known as the **prepare** step ("preparing a cartridge"), and result
-in a **deployment artifact** which is a Docker image.  Since **prepare** may contain dependencies, 
-downloads, or unreliable options that may fail, subsequent **prepare** operations may wish to reuse
-the contents of the prior image.
+OpenShift v3 cartridges will consist of an arbitrary Docker image, plus a set of [Source-To-Image](https://github.com/openshift/geard/tree/master/sti)
+scripts which define the assemble(build) and run behavior of the cartridge.  The act of transforming 
+a Docker image with STI scripts and/or source will be known as the **build** step, 
+and result in a **deployment artifact** which is a Docker image.  Since **build** process 
+may contain dependencies, downloads, or unreliable options that may fail, subsequent **build** operations may wish 
+to reuse the contents of the prior image.  This is referred to as an **incremental build**.
+
 
 
 ### What's in a deployment artifact (Docker layers)?
 
 
 
-                                                             +--------------+
-                                          +--------------+   | Symlinks     |  Deployment Layer
-                              Build Layer | Maven        |   | Built WAR    |
-                       +--------------+   +--------------+   +--------------+
-                       | Scripts      |   | Scripts      |   | Scripts      |  Cartridge Layer
-                       | JBoss        |   | JBoss        |   | JBoss        |
-    +--------------+   +--------------+   +--------------+   +--------------+
-    | Libc / Bash  |   | Libc / Bash  |   | Libc / Bash  |   | Libc / Bash  |  Base Layer
-    +--------------+   +--------------+   +--------------+   +--------------+
+                                          +-----------------+
+                                          | Symlinks        |  Deployment Layer
+                                          | Built WAR       |
+                                          | Startup Scripts |
+                       +--------------+   +-----------------+
+                       | Maven        |   | Maven(unused)   |  Cartridge Layer
+                       | JBoss        |   | JBoss           |
+    +--------------+   +--------------+   +-----------------+
+    | Libc / Bash  |   | Libc / Bash  |   | Libc / Bash     |  Base Layer
+    +--------------+   +--------------+   +-----------------+
 
-    +--------------+   +--------------+   +--------------+   +--------------+
-    | Kernel       |   | Kernel       |   | Kernel       |   | Kernel       |
-    +--------------+   +--------------+   +--------------+   +--------------+
+    +--------------+   +--------------+   +-----------------+ 
+    | Kernel       |   | Kernel       |   | Kernel          | 
+    +--------------+   +--------------+   +-----------------+ 
 
-    1. Base from CDN   2. Cartridge       3. Build Image     4. Deployment
-                                                                Artifact
+    1. Base from CDN   2. Generic         3. Deployment
+                          Docker             Artifact
+                          Image             
+                                                                                
 
-### Creating a build image flow
+### Creating a cartridge flow
 
+                                                +-------------------+
+                    Author sti scripts -------> |STI scripts        | External to docker image
+                    Author metadata    -------> |Cartridge metadata |
+                                                +-------------------+
 
-                         +----------------------+
-                         |  Cartridge Manifest  |
-                         +----------------------+
-                                    |
-                                    |
-                                    |
-                                    |
-                                    |
-                                    |           +--------------+
-                                    |           | Maven        |
-    +--------------+                v           +--------------+
-    | Scripts      |------> Add build deps +--->| Scripts      +---> save as new
+                                                +--------------+
+                                                | Maven        |
+    +--------------+                            +--------------+
+    |              |------> Add build deps +--->|              +---> save as new
     | JBoss        |                            | JBoss        |     image in Docker
     +--------------+                            +--------------+
     | Libc / Bash  |                            | Libc / Bash  |
     +--------------+                            +--------------+
 
-    Cartridge Image                             Build Image
+    Generic Image                                Cartridge
 
 
 ### Creating a deployment artifact from user source flow
 
 
-                         +--------------+
-                         | User Git     |
-                         | repo tarball |
-                         +------+-------+
-                                |
-    +--------------+            |
+
+                         +--------------+   +--------------+
+                         | STI scripts  |   | User source  |
+                         | Cart metadata|   | (git, local) |
+                         +------+-------+   +------+-------+
+                                |                  |
+    +--------------+            +------------------+
     | Maven        |            |
     +--------------+            v               +--------------+
-    | Scripts      |------>   build   --------->| Built WAR    |
+    |              |------>   build   --------->| Built WAR    |
     | JBoss        |                            +-------+------+
     +--------------+                                    |
     | Libc / Bash  |                                    |
     +--------------+                                    |
                                     +-------------------+
-    Build Image                     |
+    Docker Image                    |
                                     |               +--------------+
+                                    |               | Start scripts|
                                     |               | Symlinks     |
     +--------------+                v               | Built WAR    |
-    | Scripts      |------> create deployment +---->+--------------+
+    |              |------> create deployment +---->+--------------+
     | JBoss        |        artifact                | Scripts      |
     +--------------+                                | JBoss        |
     | Libc / Bash  |                                +--------------+
     +--------------+                                | Libc / Bash  |
                                                     +--------------+
-    Cartridge Image
+    Cartridge Image                                 
+                                                    Deployable image
 
 ### Creating a deployment artifact from binary flow
 
+Because the STI scripts which perform the build are generic, the intput "source" can
+be pre-compiled artifacts (such as a war) which will be directly deployed, rather than
+performing a build step (such as maven build).
 
-                         +-------------------+
-                         | Binary            |
-                         | (WAR / Zip)       |
-                         +-------------------+
-                                    |               +-----------------+
-                                    |               | Symlinks        |
-    +--------------+                v               | Binary (WAR/Zip)|
-    | Scripts      |------> create deployment +---->+-----------------+----> save as new
-    | JBoss        |        artifact                | Scripts         |      image in docker
-    +--------------+                                | JBoss           |
-    | Libc / Bash  |                                +-----------------+
-    +--------------+                                | Libc / Bash     |
-                                                    +-----------------+
-    Cartridge Image
-                                                   Deployment Artifact
+                         +--------------+   +--------------+
+                         | STI scripts  |   | Built war    |
+                         | Cart metadata|   |              |
+                         +------+-------+   +------+-------+
+                                |                  |
+    +--------------+            +------------------+
+    | Maven        |            |
+    +--------------+            v               +--------------+
+    |              |------>  skip build ------->| Built WAR    |
+    | JBoss        |                            +-------+------+
+    +--------------+                                    |
+    | Libc / Bash  |                                    |
+    +--------------+                                    |
+                                    +-------------------+
+    Docker Image                    |
+                                    |               +--------------+
+                                    |               | Start scripts|
+                                    |               | Symlinks     |
+    +--------------+                v               | Built WAR    |
+    |              |------> create deployment +---->+--------------+
+    | JBoss        |        artifact                | Scripts      |
+    +--------------+                                | JBoss        |
+    | Libc / Bash  |                                +--------------+
+    +--------------+                                | Libc / Bash  |
+                                                    +--------------+
+    Cartridge Image                                 
+                                                    Deployable image
+
 
 
 In V2 scalable applications, haproxy gears were responsible for distributing repository content to 
@@ -195,11 +206,11 @@ external users so they can download and run gears locally.
 
 OpenShift should support V2 cartridges and Docker cartridges side by side.
 
-In order to advance both high availability and the evolution of the platform, moving HAProxy out of
-the gears and into its own set of containers / layer would be ideal.  Further investigation is
-needed, but a number of open source projects have advanced sufficiently to where full HA routing is
-now possible without a deep investment.  In either case, the Routing SPI abstraction would allow us
-to choose how and when to move this functionality out of the main gears.
+In order to advance both high availability and the evolution of the platform, we will move HAProxy out of
+the gears and into its own set of containers / layer.  V3 will introduce a routing
+layer that operates above the gear layer, removing the requirement for applications to manage their
+own load balancing.
+
 
 
 ### Write-once Gears
@@ -220,7 +231,7 @@ those repositories while reusing existing concepts like SSH and cgroup limits.  
 invoke a plugin to create the repository container on the appropriate node, and add a special API call
 that the post-receive hook of the repository would use to notify OpenShift of a new commit.  The
 gear repo would have access to the user's public keys as they do today (potentially within a
-separate gear group).  During a prepare, OpenShift would extract the source for the application into
+separate gear group).  During a build, OpenShift would extract the source for the application into
 the cartridge image.
 
 Another consequence of write-once gears is that application environment should exist outside any 
@@ -243,7 +254,7 @@ for vulnerabilities at this layer remains high.  In the short term (2013 into 20
 conscious container operators should still run containers as non-root.  In OpenShift, the focus will
 be on enabling the use of images that may have been created or built with root access, but which at
 execution time are still jailed to a normal user.  Trusted users may still be allowed to build
-cartridges within the system, but still require a regular user for execution.
+images within the system, but still require a regular user for execution.
 
 
 ### Process management
@@ -270,6 +281,9 @@ SIGKILL.  The process entrypoint should be sure to respond to SIGTERM gracefully
 SystemD integration with Docker is an area of active investigation - there are many process
 management capabilities that would be ideal to manage from SystemD vs Docker / OpenShift.
 
+The Source-To-Image model allows for cartridge authors to define a "run" script which will be the
+default CMD for the deployable artifact image.  If a "run" script is not provided at build time,
+the resulting image will use the CMD or ENTRYPOINT defined by the input image.
 
 ### Log management
 
@@ -280,7 +294,7 @@ the scenarios described below where possible:
 1. Allow cartridges to write log data to disk into transient or mounted volume directories.
 2. Cartridge STDOUT/STDERR can be redirected by the platform to arbitrary locations.
 3. Per-container syslog mounts could be exposed that a cartridge could write to.
-4. Cartridge code can support language/framework specific log output that may go to external
+4. Cartridge or application code can support language/framework specific log output that may go to external
    sources (log4j remote logging, etc)
 
 As a cartridge author, information about how a cartridge logs should be exposed via the manifest,
@@ -289,27 +303,15 @@ and OpenShift would delegate that information as necessary to integrators.
 
 ### Downloadable Cartridges
 
-A downloadable V2 cart is a manifest that links to a source URL.  The Docker manifest should be a
-superset of a dockerfile, which means that a user can specify a dockerfile as input to creating an
-app, and that dockerfile will become a downloadable cart for the app.  When prepare happens for that
-gear, we can easily build their custom cartridge as a base layer, then run prepare on top of it.  On
-subsequent builds, the base cartridge could be refreshed (via a different mechanism probably) which
-triggers a build.
+Downloadable cartridges will no longer exist as a distinct entity in v3.  All cartridges consist
+of an arbitrary docker image plus a well defined set of scripts/manifest data.  There
+is no need for a distinction between "system" and "downloaded" cartridges.
 
 
 ### Moving HAProxy out of Gears
 
-HAProxy within web gears complicates a number of processes.  For Docker, we should investigate the
-creation and adoption of a routing layer to take edge traffic and route to gear groups based on
-endpoint data the broker has been made aware of.  We will also investigate the ability to deploy
-HAProxy gears within the application as a separate gear group.
-
-At a routing level, a further topic of investigation is the separation of traffic into low-volume
-/high-rate-of-change frontends, and high-volume/low-rate-of-change frontends.  Different
-technologies might be chosen for each which would allow new applications to go into the low-volume
-pool, and then moved into the high-volume pool via a DNS migration as an automated or administrative
-process.
-
+HAProxy within web gears complicates a number of processes.  For Docker, we will create a routing layer 
+to take edge traffic and route to gear groups based on endpoint data the broker has been made aware of.  
 
 Specification
 -------------
@@ -317,31 +319,27 @@ Specification
 
 ### Changes to manifest.yml
 
-A Docker manifest would look similar to a V2 manifest, with the addition of a "run" collection (list
-of commands to run).  A Docker manifest is a strict superset of a dockerfile.
+As a starting point, we will adapt the existing manifest.yml format with the following changes:
 
-Dockerfile | V2 | Docker | Description
------------|----|----|-------------
-FROM       |*default* RHEL 6.5 OpenShift Node environment|Runtime (URL or known constant)|The base image this cartridge depends on.
-MAINTAINER |-|Author|The author of this cartridge
-RUN        |*default* bin/install and bin/setup|Run|The series of steps used to initialize this cartridge on disk
-EXPOSE     |Endpoints|Endpoints|The internal ports and their metadata this cartridge exposes. Both V2 and Docker cartridges expose additional options as well as the protocol type.
-ENV        |*default* created during bin/setup| |An environment key and value this image starts with
-ADD        |SourceUrl| |A set of source files and destinations to copy into the container - Docker provides this at image creation time, OpenShift V2 allowed only an external URL that was downloaded into the root working directory
-ENTRYPOINT |*default* bin/control start|Execute|An executable that will be run when the container starts.
-CMD        |-|Execute|The default executable or arguments that will be run when the container starts. OpenShift docker cartridges require an executable, so a Dockerfile without CMD or ENTRYPOINT cannot be used as a cartridge.
-VOLUME     |-| |A volume or directory that will be externally mounted into the running container.  Not supported in V2.
-USER       |*default* gear user| |The Unix user the container processes will start under
-WORKDIR    |*default* gear directory| |The working directory for the ENTRYPOINT
-           | |Prepare|A path to a script (or an embedded script) that will be executed when a cartridge is **prepared**.
+Fields removed        | Reason
+----------------------|----------------------------------------------------------------------------------
+Compatible-Versions   | There is no concept of cartridge migration in v3, applications are simply rebuilt
+                      | with the new catridge version and either work, or are rolled back
+                      |
+Group-Overrides       | All cartridges will run in their own gear
+                      |
+Source-Url            | Cartridge "source" is now the docker image supplied to the build command
+Source-MD5            | No longer applicable
+
+
+Fields added          | Description
+----------------------|----------------------------------------------------------------------------------
+Image-name            | Docker image to be used if an image was not specified during "Build" invocation
+Template-location     | Optional git url to use as the template app for new instances
+Storage-path          | Location of volume mounted storage the cartridge expects to be able to write persisted data to
+                    
 
 ### Implementation Note: V2 Interoperability
-
-V2 and Docker will operate side by side in a single OpenShift environment via application-based code
-path switching.  The system will use two pools of nodes, one for V2 applications and one for Docker
-applications, with appropriate runtimes running in the nodes of each pool.  New applications might
-be created with a flag indicating the stack to use with the application, and those gears would run
-only on nodes of the appropriate type.
 
 The workflow to upgrade an application from the V2 cartridge system to the Docker cartridge system
 is currently unspecified.
@@ -355,14 +353,16 @@ manifest and uses the `oo-admin-ctl-cartridge` tool to upload the manifest to th
 manifest contains the following information:
 
 1. A reference to a publicly available docker image for the cartridge (cartridge image)
-2. A path within the cartridge image that is the `prepare` script
-3. An optional URL to git repo to use as a template for the default git repo for the cartridge.
+2. An optional URL to git repo to use as a template for the default git repo for the cartridge.
    The currently supported syntax using #&lt;commit&gt; at the end of the URL to denote a specific
    commit revision is supported.
 
 The broker creates a record for the new cartridge.  The manifest is used as part of messages to
 create new applications or add cartridges to an application, and therefore the manifest content is
 contained in the record for the cartridge.  (TODO: add information re: versioning / streams)
+
+(Open Question:  how should STI scripts be handled?  imported?  location referenced in manifest?)
+
 
 ### App Creation Workflow
 
@@ -378,31 +378,26 @@ The basic app creation workflow is as follows:
    Docker-based gears) to create a source control container, passing the template git repo URL
     1. The node downloads the specified template repo
     2. The node creates a new git repository from the template content
-5. The broker starts the prepare workflow
+5. The broker starts the build workflow
 
 
-### Gear Image Preparation Workflow
+### Gear Image Build Workflow
 
 The gear image preparation workflow is as follows:
 
 1. The broker makes a call to create a builder gear, passing the manifest and git repo:
-    1. The node downloads the application git repo into a known directory for bind-mount into
-       the builder gear container
-    2. If the manifest defines a prepare command, starts the container with
-       `docker run -e <prepare cmd>`
-    3. If not, the node starts the container with `docker run`
-    4. The node waits for the container to finish running, imposing a timeout
-    5. The node extracts from the container (method TBD) any necessary stateful information such as: environment
-       variables, cartridge hooks, dynamic network endpoints
-    6. The node performs a docker commit which creates the **deployment layer**
-    7. The node pushes the docker image to the application's private docker registry
-    8. The node reports the new deployment artifact (DA) id to the broker
+    1. The builder component invokes "gear build" passing the image name from the manifest and the
+       location of the new application repository
+    2. The build component waits for the build to finish running, imposing a timeout
+    3. At completion, the deployable image has been committed
+    4. The build component pushes the docker image to the application's private docker registry
+    5. The node reports the new deployment artifact (DA) id to the broker
 2. The broker creates a new (DA) record for the application
 3. The broker starts the deploy workflow
 
 #### Incremental Image Preparation
 
-The preparation described above is a **clean prepare** - completely regenerating the layer containing the user source code.  A consequence of a clean prepare is that the prepare script must redownload any dependencies of the application source (Ruby gems, Python eggs, Maven JARs).  This may result in the versions of those dependencies changing and the introduction of failures or bugs.  Therefore, there must be the possibility of an **incremental prepare** for security updates that allows a cartridge to reuse some or all of the previously generated content.
+The preparation described above is a **clean prepare** - completely regenerating the layer containing the user source code.  A consequence of a clean prepare is that the prepare script must redownload any dependencies of the application source (Ruby gems, Python eggs, Maven JARs).  This may result in the versions of those dependencies changing and the introduction of failures or bugs.  Therefore, there must be the possibility of an **incremental build** for security updates that allows a cartridge to reuse some or all of the previously generated content.
 
 Potential problems caused by reusing a previous deployment layer:
 
@@ -413,30 +408,23 @@ Potential problems caused by reusing a previous deployment layer:
 
 In all of these scenarios, the cartridge author and platform must coordinate around which content can be reused and when a full rebuild is required.
 
-The incremental prepare workflow might look like:
+The incremental build workflow is:
 
-1. The broker makes a call to create a builder gear, passing the manifest, git repo, and previous gear image id:
-    1. The node downloads the application git repo into a known directory for bind-mount into
-       the builder gear container
-    2. The node fetches the deployment layer of the previous gear image by its id.
-    3. The node calculates which contents from the previous image should be used in the new container, and if necessary copies them into the container.
-    4. If the manifest defines a prepare command, starts the container with
-       `docker run -e <prepare cmd>`
-    3. If not, the node starts the container with `docker run`
-    4. The container code must decide whether to reuse the previously generated contents, or whether to continue without them (if a file listing dependencies has changed, new dependencies must be downloaded).
-    5. The node waits for the container to finish running, imposing a timeout
-    6. The node extracts from the container (method TBD) any necessary stateful information such as: environment
-       variables, cartridge hooks, dynamic network endpoints
-    7. The node performs a docker commit which creates the **deployment layer**
-    8. The node pushes the docker image to the application's private docker registry
-    9. The node reports the new deployment artifact (DA) id to the broker
+1. The broker makes a call to create a builder gear, passing the manifest and git repo, and previous gear image id:
+    1. The builder component invokes "gear build" passing the image name from the manifest, location of the application repository, and the previous image id
+    2. The build process extracts dependencies from the previous image and bind-mounts them into the new image during the normal build flow
+    3. The build component waits for the build to finish running, imposing a timeout
+    4. At completion, the deployable image has been committed
+    5. The build component pushes the docker image to the application's private docker registry
+    6. The node reports the new deployment artifact (DA) id to the broker
 2. The broker creates a new (DA) record for the application
 3. The broker starts the deploy workflow
+4. If the new image fails to deploy, the application is rolled back to the previous working image
 
 
 #### Version upgrade
 
-A prepare may result in the version of a cartridge in use changing in the broker - it may have been
+A build may result in the version of a cartridge in use changing in the broker - it may have been
 input by the developer at build time.  An application may have multiple cartridge versions in
 different gears as a result of a deploy.  The broker should gracefully handle rollforward and
 rollback of this scenario:
@@ -516,9 +504,10 @@ image with the same mounts / user / network bindings, but it has been requested.
 
 To upgrade a Docker gear (when a security update is released to a package):
 
-1. Identify all the base cartridges that would be affected
+1. Identify all the base images that would be affected
 2. For each cartridge:
-   1. Rebuild the cartridge from its dockerfile
+   1. Rebuild the image from its dockerfile 
+      * Not all base images will be under OpenShift control as any docker image can be a base image for a cartridge
    2. Store the new version of the cartridge image alongside the old one
    3. Mark all the applications using the old cartridge image as needing a rebuild
 3. For each application needing a rebuild
@@ -537,39 +526,63 @@ These topics need further investigation:
 * Enabling the ability to run 'yum' in a container and how that affects root security
   * Needs discussion with Dan Walsh for security - need to elaborate all potential risks with
     RPM install inside container
+  * Container namespacing should eventually allow users to be "root" inside their containers without
+    exposing the host system  
+    
 * Disk usage of layers can be extreme:
   * Example is Java, where you may have 100M of base cartridge files, but Maven brings down
     1GB of data
-  * Need to explore how builds and cartridges can coexist without making carts hard to write,
-    and how we deal with lots of disk usage during prepare.
+  * Need to explore how builds and cartridges can coexist(???) without making carts hard to write,
+    and how we deal with lots of disk usage during build.
+        
 * Density of docker containers
+  * Memory cost due to shared libraries no longer being shared
+  * Higher disk usage for unshared duplicate dependencies
+  
 * How can container hooks be supported - which are necessary and which are not
   * Should hooks be run at build time by passing in the info about the current app, and then
     the env vars are changed as the app is rolled out?
+  * Currently any app can overwrite the build(assemble) and run scripts to control behavior, but
+    this requires overwriting the entire script, not appending specific commands to occur before/after
+    the build process is complete.
+  * Prime candidate: database initialization/population logic
+
+* Where to store stateful data (db data, configuration data)
+  * Generated credentials(eg db password) need to be preserved through a rebuild
+    * Could be stored as env variables held in the broker
+    * Could be stored in the DA and preserved via incremental build state (but would be lost during clean build)
+  * When is/isn't the stateful data rolled back if the application is rolled back
+  * DB files should be on volume mounted storage(specified in manifest)
+    * This means DB creation (including credential creation) cannot occur until the application is started
+    * Unless there is a pre-deployment phase where the image is started w/ volume mounted storage just for executing predeploy hooks
+  
 * Examples of individual scenarios for each type of cartridge
 * Plugin cartridges - composition (more images and slower builds) or injection (limited
   capabilities)
   * Cron
-  * Jenkins-client
+  * Jenkins-client    
 * The exact process by which large number of gears are updated
 * Details of how cartridges are built - we need to support multiple versions of each cartridge
   for much longer and the broker has to handle that
-* Supporting arbitrary docker images (environment only injection)
+* Supporting arbitrary docker images (environment only injection) - RESOLVED
 * Updating a docker image in place (upgrade)
 * Letting users define a cartridge as a dockerfile - downloadable cartridge replacement
+  * Mostly resolved.  Users define an arbitrary docker image+manifest+scripts
 * Gear migration across servers
 * Quota and images (can be managed in thinp in gears, docker registry should give us more).
 * Routing discussion, but we have 90% of everything we need
+  * How does an application reveal its endpoints to the routing layer
+  * Or how does the broker know what endpoints the application exposes
 * How do port mappings and the port limit change?
 * Is move still necessary?
+  * Yes, must at least move the bind-mounted data
 * Where are environment variables stored?
   * In bind mount directory?
   * Env vars now have to be distributed to all nodes
+  * Stored in broker storage, provided to docker run invocation of the image
 * How are bind mounts from persistent per node storage managed?
   * Same as today, bind /var/lib/openshift/<gear>/data to an arbitrary location rather than inside
     home
-* How does gear directory change?  No home mount automatic binding - home dir is transient per
-  gear?
 * Two carts with same contract with source repo but different operating systems
   * Both java-tomcat-maven, only one is supported
   * UI/broker groups them together so you get a choice (RHEL supported, Fedora community
@@ -578,6 +591,7 @@ These topics need further investigation:
   * Still need RPMs eventually for real distributions
 * SSH can be optionally implemented
   * Similar model but different behavior, LXC attach, krishna looking at it.
+  * switchns today, eventually docker exec
 * How do we rebuild without grabbing new dependencies?  How do we do a security update that doesn't 
 need a build efficiently?  If we take a security update and break because of a build dependency change,
 that's worse than the security update breaking the app.
