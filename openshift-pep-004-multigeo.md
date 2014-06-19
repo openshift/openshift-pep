@@ -21,17 +21,18 @@ Several users and the OpenShift Online operations team have requested this featu
 Specification
 -------------
 
-Considerations included for version 1:
- * Let the user specify what geo to create an application in
+Included for version 1:
  * Let admins control the default geo for an application (for when no geo is specified)
- * Add geo naming abilities to the broker (listed below in implementation)
- * Individual namespace for different geo's is likely but more research needs to be done here particularly around large scaling.  This would be like name-domain.us1.rhcloud.com and name2-domain.uk4.rhcloud.com.  The question is whether DNS can handle 100 million entries in a single domain just as well as it can handle 1 million entries in 100 subdomains.
+ * Let admins plugin their own geo placement algorithm (Ex: based on user's geo).
+ * Add non affinity zones (Ex: rack) for higher availability.
+ * Add geo(region)/zone assignment to the broker (as metadata to nodes in districts)
+
 
 
 Considerations explicitly excluded for a future version:
+ * Let the user specify what geo to create an application in
  * Applications located across multiple geo's for HA, DR or scale.
- * Migration of applications or gears from one geo to another
- * Private connectivity between different geo's.  If you want to communicate cross geo with this PEP you'll have to do it on a public network (SSL encouraged) or via some other in-house solution.
+ * Private connectivity between different geos.  If you want to communicate cross geo with this PEP you'll have to do it on a public network (SSL encouraged) or via some other in-house solution.
 
 Implementation Details
 ----------------------
