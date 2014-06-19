@@ -80,7 +80,7 @@ to reuse the contents of the prior image.  This is referred to as an **increment
                                           | Built WAR       |
                                           | Startup Scripts |
                        +--------------+   +-----------------+
-                       | Maven        |   | Maven(unused)   |  Cartridge Layer
+                       | Maven        |   | Maven (unused)  |  Cartridge Layer
                        | JBoss        |   | JBoss           |
     +--------------+   +--------------+   +-----------------+
     | Libc / Bash  |   | Libc / Bash  |   | Libc / Bash     |  Base Layer
@@ -117,7 +117,6 @@ to reuse the contents of the prior image.  This is referred to as an **increment
 ### Creating a deployment artifact from user source flow
 
 
-
                          +--------------+   +--------------+
                          | STI scripts  |   | User source  |
                          | Cart metadata|   | (git, local) |
@@ -136,19 +135,110 @@ to reuse the contents of the prior image.  This is referred to as an **increment
                                     |               +--------------+
                                     |               | Start scripts|
                                     |               | Symlinks     |
-    +--------------+                v               | Built WAR    |
-    |              |------> create deployment +---->+--------------+
-    | JBoss        |        artifact                | Scripts      |
-    +--------------+                                | JBoss        |
-    | Libc / Bash  |                                +--------------+
-    +--------------+                                | Libc / Bash  |
+                                    v               | Built WAR    |
+                            create deployment +---->+--------------+
+                            artifact                | Maven        |
                                                     +--------------+
-    Cartridge Image                                 
+                                                    | JBoss        |
+                                                    +--------------+
+                                                    | Libc / Bash  |
+                                                    +--------------+
+                                    
                                                     Deployable image
+
+### Incremental Builds
+
+Once a deployment artifact has been built, subsequent rebuilds of the same artifact
+(either due to application source changes, or to pick up a security fix to a lower
+layer of the image) can be optimized by reusing artifacts (eg downloaded dependencies)
+from the first build.
+
+Image authors can achieve this by providing a save-artifacts script that will archive
+useful bits from the old image.  Those bits will be made available to the assemble
+script during the build.
+
+
+                         +--------------+   +--------------+  +--------------+
+                         | STI scripts  |   | User source  |  | Previous     |
+                         | Cart metadata|   | (git, local) |  | image        |
+                         +------+-------+   +------+-------+  +------+-------+
+                                |                  |                 |
+                                |                  |            save-artifacts
+                                |                  |                 |
+                                |                  |                 v
+                                |                  |          +--------------+
+                                |                  |          | artifacts    |
+                                |                  |          |              |
+                                |                  |          +------+-------+
+                                |                  |                 |
+                                |                  |                 |
+    +--------------+            +------------------+-----------------+
+    | Maven        |            |
+    +--------------+            v               +--------------+
+    |              |------>   build   --------->| Built WAR    |
+    | JBoss        |                            +-------+------+
+    +--------------+                                    |
+    | Libc / Bash  |                                    |
+    +--------------+                                    |
+                                    +-------------------+
+    Docker Image                    |
+                                    |               +--------------+
+                                    |               | Start scripts|
+                                    |               | Symlinks     |
+                                    v               | Built WAR    |
+                            create deployment +---->+--------------+
+                            artifact                | Maven        |
+                                                    +--------------+
+                                                    | JBoss        |
+                                                    +--------------+
+                                                    | Libc / Bash  |
+                                                    +--------------+
+                                        
+                                                    Deployable image
+
+### Extended Builds
+
+In some cases, it may not make sense for packages required to build an application also
+be present in the deployed image.  For example, maven may be required to build some
+java applications, but it is not needed to run them.  To address these scenarios, 
+extended builds will be supported.  In an extended build, one image is used to perform
+the build and output the deployable application artifacts.  Those artifacts are then
+added to the runtime framework image to create the deployable artifact.
+
+
+                         +--------------+   +--------------+
+                         | STI scripts  |   | User source  |
+                         | Cart metadata|   | (git, local) |
+                         +------+-------+   +------+-------+
+                                |                  |
+    +--------------+            +------------------+
+    | Maven        |            |
+    |              |            v               +--------------+
+    +--------------+------>   build   --------->| Built WAR    |
+    |              |                            +-------+------+
+    | Libc / Bash  |                                    |
+    |              |                                    |
+    +--------------+                                    |
+                                    +-------------------+
+    Docker Image                    |
+                                    |               +--------------+
+                                    |               | Start scripts|
+                                    |               | Symlinks     |
+    +--------------+                v               | Built WAR    |
+    | JBoss        |        create deployment +---->+--------------+
+    +--------------+------> artifact                | Maven        |
+    | Libc / Bash  |                                +--------------+
+    +--------------+                                | JBoss        |
+                                                    +--------------+
+                                                    | Libc / Bash  |
+    Docker Image                                    +--------------+
+                                    
+                                                    Deployable image
+
 
 ### Creating a deployment artifact from binary flow
 
-Because the STI scripts which perform the build are generic, the intput "source" can
+Because the STI scripts which perform the build are generic, the input "source" can
 be pre-compiled artifacts (such as a war) which will be directly deployed, rather than
 performing a build step (such as maven build).
 
@@ -170,14 +260,15 @@ performing a build step (such as maven build).
                                     |               +--------------+
                                     |               | Start scripts|
                                     |               | Symlinks     |
-    +--------------+                v               | Built WAR    |
-    |              |------> create deployment +---->+--------------+
-    | JBoss        |        artifact                | Scripts      |
-    +--------------+                                | JBoss        |
-    | Libc / Bash  |                                +--------------+
-    +--------------+                                | Libc / Bash  |
+                                    v               | Built WAR    |
+                            create deployment +---->+--------------+
+                            artifact                | Maven        |
                                                     +--------------+
-    Cartridge Image                                 
+                                                    | JBoss        |
+                                                    +--------------+
+                                                    | Libc / Bash  |
+                                                    +--------------+
+                                     
                                                     Deployable image
 
 
@@ -190,12 +281,13 @@ broker to scale up or down.
 Plugin cartridges are TBD, but they may be injected during the prepare step or bind mounted into the
 gear after launch.
 
-In order to deliver security updates to cartridges, the operator must be able to regenerate docker
-images and then trigger builds in affected gears.  This is a long running operation and may also
-involve skipping failed builds and notifying affected users.  Cartridge authors may need to 
-provide additional functionality to allow incremental layer creation - reusing downloaded 
-dependencies and generated files from a previous image - in order to ensure security updates do not
-break user applications unintentionally.
+In order to deliver security updates to cartridges, the operator must be able to rebuild (docker build)
+docker images and then trigger application builds for affected applications to create a new deployable 
+images for those applications.  This is a long running operation and may also involve skipping failed builds 
+and notifying affected users.  In order to optimize the rebuild process and exert control over application
+dependencies that may have been previously downloaded, cartridge authors can provide additional functionality 
+to allow incremental layer creation - reusing downloaded dependencies and generated files from a previous 
+image.  See "incremental builds" for more details.
 
 Docker images live in a registry backed by some persistent storage.  OpenShift requires a registry
 solution that allows both public and private images. Public images would be where shared
@@ -246,6 +338,14 @@ code, but a developer would be able to choose that new cartridge version to appl
 It is important to note that gears will still have ephemeral local storage for use in caching 
 scenarios.
 
+### Quickstarts and InstantApps
+
+For the first iteration, the multicartridge topologies defined by instant apps will be created by
+single docker images that contain all the component pieces.  Quickstarts (external initial source
+repo) should continue to work as today by providing a github repo during app creation.  STI 
+already supports this model for building images from a remote source repository.
+
+
 ### Container security
 
 In the Linux kernel the user namespace feature offers the ability for a container to have a root
@@ -266,6 +366,8 @@ executed when the container is started.  This entrypoint is expected to be a sta
 * It should either log to disk, syslog, or STDERR/STDOUT
 * When the process goes away, Docker considers the container stopped.
 
+The easiest approach to this is for the entrypoint to perform an exec.
+
 In general, cartridges should expose the lowest level process that can manage the work the cartridge
 accomplishes.  Using SystemD or SysInit within a cartridge generally brings additional behavior that
 prevents the platform itself (if not initially, then later) from offering advanced process
@@ -285,21 +387,48 @@ The Source-To-Image model allows for cartridge authors to define a "run" script 
 default CMD for the deployable artifact image.  If a "run" script is not provided at build time,
 the resulting image will use the CMD or ENTRYPOINT defined by the input image.
 
+### Healthchecking/Liveness
+
+Containers for a cartridge can be checked for liveness via port connectivity, or by providing a script
+which will be run inside the container namespace.  The cartridge manifest will define how the
+container should be probed.
+
+Applications will also be able to define an application-level health check, but that is beyond the 
+scope of cartridges.
+
 ### Log management
 
-Different frameworks and languages offer different log capabilities, and many require significant
-configuration to work in different modes.  OpenShift should offer platform tooling that simplifies
-the scenarios described below where possible:
+Cartridges will log to stdout (where it will be captured to journald by the host) or handled by the
+cartridge directly (eg logging to an external logging service).
 
-1. Allow cartridges to write log data to disk into transient or mounted volume directories.
-2. Cartridge STDOUT/STDERR can be redirected by the platform to arbitrary locations.
-3. Per-container syslog mounts could be exposed that a cartridge could write to.
-4. Cartridge or application code can support language/framework specific log output that may go to external
-   sources (log4j remote logging, etc)
+### Metrics
 
-As a cartridge author, information about how a cartridge logs should be exposed via the manifest,
-and OpenShift would delegate that information as necessary to integrators.
+Cartridges will be free to record and report metrics to external services (eg New Relic).
+It is not yet clear if OpenShift will provide a built in metric aggregation/reporting service
+for cartridges to use.
 
+### Environment Variables
+
+Environment variables are managed by docker itself, and in turn can be fed in from an external
+orchestrator.  Managing them will not be a cartridge responsibility.  Environment variables can 
+be used to feed into dynamic configuration settings at startup/runtime.
+
+### Runtime configuration
+
+Many runtimes require configuration customization.  V3 will support two approaches to supplying this
+configuration information:
+1) Cartridge startup scripts can process environment variables to populate a configuration template
+2) Cartridge assemble scripts can pull in configuration files supplied by the application source
+   repository.
+   
+Note that 1+2 can be used in conjunction as well.
+
+### Configuration sharing
+
+In V2, cartridges could publish and subscribe to specific bits of information such as database 
+passwords or lists of cluster members.  
+
+In V3 cartridges will be able to share this type of information by [TBD]
 
 ### Downloadable Cartridges
 
@@ -310,8 +439,9 @@ is no need for a distinction between "system" and "downloaded" cartridges.
 
 ### Moving HAProxy out of Gears
 
-HAProxy within web gears complicates a number of processes.  For Docker, we will create a routing layer 
-to take edge traffic and route to gear groups based on endpoint data the broker has been made aware of.  
+HAProxy within web gears complicates application lifecycle management and scaling.  To address this, 
+we will create a routing layer to route edge traffic to gear groups based on endpoint data 
+the broker has been made aware of.  
 
 Specification
 -------------
@@ -337,6 +467,7 @@ Fields added          | Description
 Image-name            | Docker image to be used if an image was not specified during "Build" invocation
 Template-location     | Optional git url to use as the template app for new instances
 Storage-path          | Location of volume mounted storage the cartridge expects to be able to write persisted data to
+Liveness-check        | Mechanism for checking if the container is started/live (port(s) to probe, script(s) to run)
                     
 
 ### Implementation Note: V2 Interoperability
