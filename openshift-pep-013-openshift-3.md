@@ -160,10 +160,10 @@ In a 3.x system, an image repository is a reusable component across multiple ser
 
 In OpenShift 2.x, the primary unit of access control was the domain, which has a membership list and each member is granted a specific role.  Someone with access to a domain sees all of the resources belonging to the domain.  The domain owner may allow a subset of their capabilities to be expressed within the domain in order to subdivide their resources across multiple subsets of users - for instance, by limiting the gear sizes or cartridges available to an end user.
 
-In 3.x this pattern will continue, but we will rename the domain to a **project** to more closely associate the concept with its true use.  
+In 3.x this pattern will continue, but we will rename the domain to a **project** to more closely associate the concept with its common use.  
 
 ##### **Project**
-The project is the set of resources that a team of people with a joint objective can access - the role each person or machine has on the project also applies to each resource. in the project  
+The project is the set of resources that a team of people with a joint objective can access - the role each person or machine has on the project applies to each resource in the project.
 
 * Should be used to subdivide visibility and control
 * Should represent the fundamental units of the organization creating the software 
@@ -183,13 +183,29 @@ In a system with multiple login providers and ways of authenticating, an identit
 * Most systems will have a default identity
 * All actions in the system should be associated with an identity and an account
 
+
 ##### **Machine Identity**
 It should be possible to grant access on APIs and resources of a project to an automated system without requiring the creation of a new user account.  Each project should allow 0..N machine identities to be created which can have individual authorization tokens granting access to the project.
 
 * A machine identity may be created by the owner or administrator of a domain
 * A machine identity may have 0..N authorization tokens
+* A machine identity may have 0..N private SSL keys assigned to it with downloadable public keys
 * A record of all machine identities and their authorization tokens and the creators of those identities and tokens should be stored for audit purposes
 * Any API action taken by a machine identity should be identified as such
+* When integrating with external source control solutions, the machine identity SSH private keys will be used to authenticate to the remote solutions over SSH.  There may be a need to pick the appropriate keys offered.
+
+
+##### **Roles**
+In general the OpenShift access control model focuses on roles rather than assigning individual permissions.  It makes clients easier to build and is easier for users to reason about.  To that extent, we expect to continue to offer the same generally increasing roles we have in 2.x, with the potential for more flexibility in customization.
+
+Defined roles:
+
+* View - Can see everything except secure data, does not necessarily have SSH access
+* Edit - Can create or delete services, but not modify resource limits or assign access control
+* Admin - Can assign access control, and modify some resource limits
+* Admin(owner) - Can modify all resource limits
+
+A long term objective is to ensure the owner role is decoupled from a single account, so that organizations are less vulnerable to a single person leaving.  A new role may be created "owner" which allows other owners to be assigned and to set resource limits.
 
 
 #### Service Oriented Containers
