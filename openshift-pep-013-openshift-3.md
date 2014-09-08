@@ -56,12 +56,12 @@ load-balanced HTTP or SSL gear group, and shared environment variables
 These resources are nested:
 
 * 1 account
-    * 0..N projects
-          * 0..N applications
-                  * 1..N cartridge versions (but all versions must have different names)
+  * 0..N projects
+    * 0..N applications
+      * 1..N cartridge versions (but all versions must have different names)
       * 1..M gear groups
-                * 1..P gears
-                        * 1..L aliases
+        * 1..P gears
+      * 1..L aliases
 
 ### 3.x model
 
@@ -320,21 +320,21 @@ These resources are nested:
 
 * 0..N public image repositories
   * 1 account
-      * 0..N projects
-              * 0..N image repositories
-                          * 0..X owned image repositories
-                                      * 0..Y shared image repositories
-                                                  * 0..M references to images (images are one-to-many repositories)
-    * 0..N services
-            * 1 active pod definition (1..M images)
-                        * references 1..M image repositories or explicit images
-          * additional per image config that becomes the template for containers
-      * 0..N instances of a pod
-              * 0..N deployments
-                      * 0..1 source code repositories
-                              * 0..1 builds
-                                      * 0..N aliases
-                                              * 0..N environment variables
+    * 0..N projects
+      * 0..N image repositories
+        * 0..X owned image repositories
+        * 0..Y shared image repositories
+      * 0..M references to images (images are one-to-many repositories)
+      * 0..N services
+        * 1 active pod definition (1..M images)
+          * references 1..M image repositories or explicit images
+            * additional per image config that becomes the template for containers
+        * 0..N instances of a pod
+        * 0..N deployments
+        * 0..1 source code repositories
+        * 0..1 builds
+        * 0..N aliases
+        * 0..N environment variables
       * 0..N links
 
 
