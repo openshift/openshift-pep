@@ -15,7 +15,7 @@ Create a hosted Git service for OpenShift 3.
 
 Motivation
 ----------
-The OpenShift hosted Git service provides Git repositories for users who don't have access to any other Git repository hosting service. 
+The OpenShift hosted Git service provides Git repositories for users who don't have access to any other Git repository hosting service, or for someone who wants an all-in-one solution for source control with their PaaS. 
 
 Specification
 -------------
@@ -64,6 +64,9 @@ The controller could either run in the background in the same Git backend contai
 
 ### Quotas
 Each repository is assigned its own quota. Administrators should be able to configure the default quota value in the OpenShift master. Users may be able to request additional quota on a per repository basis.
+
+### Hooks
+TODO
 
 ### Recovery process
 If a Git backend pod is lost unexpectedly, there must be a process to create a new pod to assume the duties of the previous one. The ideal way to handle this is to define a ReplicationController for the pod, and let OpenShift (Kubernetes) ensure the replica count is maintained at 1. If the pod dies, a replacement is created automatically as part of the replication controller functionality.
