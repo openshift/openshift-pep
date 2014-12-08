@@ -1,27 +1,123 @@
 PEP: 014  
-Title: OpenShift 3 SSH Proxy  
+Title: OpenShift 3 SSH to Containers  
 Status: draft  
 Author: Andy Goldstein <agoldste@redhat.com>  
 Arch Priority: medium  
-Complexity: 40  
+Complexity: 100  
 Affected Components: apiserver  
 Affected Teams: Runtime, Infrastructure  
-User Impact: low  
-Epic: [SCM](https://trello.com/c/L1Df40pk/68-source-control-management-scm)
+User Impact: medium  
+Epic: TBD
 
 Abstract
 --------
-Create a proxy service for users to access cluster resources via SSH. The proxy provides an abstraction from the physical location of the requested resource; if the resource moves, its URI remains unchanged, so clients don't have to update their configurations. Examples of cluster resources the proxy may support: SSH access to containers, port forwarding.
+Users and administrators are used to being able to SSH to their servers to perform various tasks. We need to devise a means for users to access cluster-managed containers via SSH.
+
 
 Motivation
 ----------
-- Provide a consistent URI to cluster resources
-- Allow resources to move within the cluster without requiring client configuration updates
-- Avoid single points of failure
+- Provide SSH access to cluster-managed containers
 
 
 Specification
 -------------
+### Container identification
+In OpenShift, the smallest deployable unit is a pod (a group of 1 or more containers), not a single container. A container belongs to a pod, which belongs to a namespace. To uniquely identify a specific container, you must specify all 3 elements: namespace, pod name, container name.
+
+To support as many SSH clients as possible, we really only have two items we can use when specifying which container is the target of an SSH request: username and hostname. If SSH supported HTTP-style virtual hosts, things would be easy, as we could just use something like `$namespace-$pod-$container.openshift.com` for the hostname, and that would identify the container. Unfortunately, this feature doesn't exist (although it has been discussed [here](https://groups.google.com/forum/#!topic/mailing.unix.openssh-dev/cyf3bhxpc8U)). For smaller environments, if it's possible to assign 1 IP address per namespace/pod/container, hostname could be a viable identification mechanism, but this would require a lot of dynanmic infrastructure changes (DNS updates, sshd configuration updates) on the fly, so it's probably not practical.
+
+That leaves username as the sole means to identify the container. Linux usernames are limited to 32 characters, and it's highly likely that the namespace/pod/container combination will exceed the 32 character limit.
+
+We could potentially use Docker container IDs, although they are 64 characters and look like `718b86bd82e457d802f7077d79ab62e4ff386aaeb4fb1f5d00ec1475c42b7e5f`. A container's ID can reasonably be shortened while still avoiding collisions; Docker shortens them to 12 characters when displaying them in `docker ps` (e.g. `718b86bd82e4`). Docker container IDs are not stored in etcd nor are they available in any of the API server's data types (i.e. pod and its related types don't have the container ID).
+
+When the cluster creates a container, it assigns the container a name such as `k8s_dockerregistry.b1c4fcf9_registry.default.etcd_1417618667_5c7a85e8`, which is clearly more than 32 characters, and not a good candidate for the identifier.
+
+A pod may be deleted from one node and recreated on the same node or on another one depending on various factors (scaling events, node evacuation, etc.). When this happens, the Docker container IDs and Docker names of all the pod's containers change. There are things that remain consistent: the pod's namespace, the pod's name, and the pod's containers' names (as specified in the pod definition; not the Docker container names for them). However, if replication controllers are used, the name of each pod created by a replication controller is a randomly-generated UUID such as `f9bc6e3d-7b15-11e4-a6c4-001c42c44ee1`.
+
+We looked at sending an environment variable (`-o SendEnv ...`) to specify the container, but unfortunately you can't set the value in an entry in the `~/.ssh/config` file; you can only specify that the variable be passed from client to server, using its current value. An example would look something like this:
+
+	CONTAINER=$ns/$pod/$container ssh -o 'SendEnv Container' ssh@ssh.openshift.com
+
+This isn't elegant, and the user experience is suboptimal (or maybe even impossible if an SSH client doesn't support sending evironment variables).
+
+Out of all of the possibilities listed above, the one that seems best is using namespace/pod/container as the username, along with a custom NSS module to overcome the 32 character limit (more on this below).
+
+#### How do we specify a pod in a replication controller?
+A pod in a replication controller is assigned a randomly-generated UUID as its name. This makes it difficult to provide a constant SSH URL. Imagine a replication controller named `foo` that defines some pod with a replica count of 3. You might end up with 3 pods named like this:
+
+```
+f9bc6e3d-7b15-11e4-a6c4-001c42c44ee1
+f9bc9428-7b15-11e4-a6c4-001c42c44ee1
+f9bca1c2-7b15-11e4-a6c4-001c42c44ee1
+```
+
+The SSH URL for a container in the first pod might be `somenamespace/f9bc6e3d-7b15-11e4-a6c4-001c42c44ee1/apache`, which will remain constant as long as that pod exists. We could try to simplify things and support `namespace/replicationController[index]/container`, which would make the above example `somenamespace/foo[0]/apache`, but even then, you can't be certain that you're consistently referring to the same exact pod, in the event that 1 of the members of the replica set is deleted and recreated, or if the order of the pods retrieved when matching the replication controller's label selector changes.
+
+This type of simplification might be useful, but it is not a method that guarantees that a user always gets the same container everytime `namespace/replicationController[index]/container` is resolved.
+
+### To proxy or not?
+Using namespace/pod/container as the username tells us the container, but it doesn't give any information about the host where the container lives. We can have users SSH directly to the container's node to reach the container, or we could have all SSH connections go through a proxy instead.
+
+SSHing directly to the container's node works as long as the container isn't deleted and recreated at some point. But if it does move to a different node, the previous SSH URL (e.g. `namespace/pod/container@node1.openshift.com`) is no longer valid.
+
+If we want to have a constant URL for a container regardless of the host where it's running, we need a proxy with a constant URL. To SSH to a container using a proxy, we'd have a URL such as `namespace/pod/container@ssh.openshift.com`. Even if the container moves to a different node, the SSH URL remains the same. The proxy would be responsible for inspecting the username, determining the container's node, and forwarding the request to that node.
+
+The proxy approach provides a better user experience, but adds complexity to the overall implementation. The client must authenticate with both the proxy's sshd and the node's sshd, but we don't want the client to know about the 2 different sshd servers and ask them to authenticate twice. We could require the client to use an SSH agent and accept the same public keys from the client in both the proxy and node, but that would require SSH agent forwarding, which we shouldn't allow on a multi-tenant server.
+
+As an alternative to agent forwarding, we could have the proxy obtain some form of authentication (token or key pair) from OpenShift as soon as the user authenticates to the proxy. The proxy would then pass this authentication to the node's sshd server.
+
+**IMPORTANT CAVEAT** OpenShift deployments, the common way users get a new version of their code running, are implemented using replication controllers. As described above, this means
+
+1. pods are assigned unguessable UUIDs for their names
+2. **each deployment results in 1 or more brand new pods, with different names than the previous deployment**
+
+As a result, containers created using OpenShift deployments essentially never have consistent names because they don't have consistent pod names. This means proxying connections to these types of containers through an SSH proxy don't provide any significant benefit.
+
+#### How do we do port forwarding, scp, & sftp to a container with a proxy?
+If the flow with a proxy is client <-> proxy sshd <-> node sshd, is it possible to support port forwarding, scp, and sftp? Of the 3, scp is the easiest, as it simply runs `scp` as a remote command.
+
+Port forwarding and sftp are more challenging. With both of these, the ssh client sends SSH protocol messages to the sshd server, and these messages are not visible to whatever shell or process is executed by sshd upon client connection. Port forwarding is feasible with a flow such as this:
+
+client `ssh -o "ProxyCommand ssh -W %h:%p ssh.openshift.com" namespace/pod/container@node123.openshift.com` -> proxy sshd -> node sshd -> `nsenter -t $containerPid -m -u -i -n -p socat - tcp4-listen:$port,fork`
+
+With `ProxyCommand ssh -W %h:%p ssh.openshift.com`, the client's ssh client establishes a connection and authenticates to ssh.openshift.com, opens a connection to the node's sshd at `namespace/pod/container@node123.openshift.com`, and then forwards all stdin/stdout between the ssh client and the node's sshd. This allows SSH protocol messages to work between the client and node sshd. Without `ProxyCommand ssh -W %h:%p`, the SSH protocol messages would be between the client and the proxy sshd server, which isn't what we want. While this looks feasible, it is not a good user experience and may not be supported by all SSH clients.
+
+SFTP might not be possible with a stock OpenSSH sshd server. For this to work, the SFTP SSH protocol messages would need to be between the client and the node's sshd, just like with port forwarding. While this is feasible with the `ProxyCommand` option described above, that would only get us access to the node's file system. We'd ideally want to `nsenter` the mount namespace of the container to access its files, but that would presumably require modifications to OpenSSH itself, as it is currently responsible for launching `sftp-server` for an incoming SFTP request, and it doesn't appear to be possible to alter that process flow to insert `nsenter` as part of it.
+
+### User id (uid) & isolation
+If we use namespace/pod/container as the username, we need a uid to correspond to the username. Note, this uid is just used for the SSH session; processes in the container do not run as this uid. We could attempt to assign a unique uid to each container, but given that the number of containers created over the cluster's lifetime could potentially be in the millions or billions, this doesn't seem like a viable path. We also need to avoid a collision where 2 SSH sessions to 2 different containers share the same uid.
+
+It is probably best to define a maximum number of containers that a given node may run simultaneously. When a container is scheduled onto a node, it should be assigned a unique uid from the pool of available uids for that node. Whenever a container is removed from a node, its uid is returned to the pool for possible future reassignment.
+
+After a client has been authenticated, sshd drops privileges and switches to run as the authenticated user. When multiple clients connect to sshd, we want to ensure that one client is not allowed to see another client's information. We can achieve isolation by giving each container a unique uid for SSH sessions and by setting a unique SELinux MCS label for the execution context of these processes and their descendents.
+
+OpenShift 2 uses a custom PAM module, [pam_openshift](https://github.com/openshift/origin-server/tree/master/pam_openshift), to set the SELinux context consistently based on the uid when a user interacts with a gear via SSH. OpenShift 3 could continue to use this module.
+
+### What if the container doesn't have a shell?
+Some container images are designed to be extremely small, comprised of just a single executable. These types of containers don't have a shell that can be used for SSH access. There are a couple of ways we could approach this:
+
+1. Tell users their container must have a shell if they want shell access
+2. Automatically add a special utility volume to every pod (bind mount into containers) with helpful tools such as a shell
+
+Supplying a utility volume has some possible issues and downsides:
+
+1. The architecture of the shell in the utility volume might not match that of the container
+2. The mount point of the utility volume in the container could potentially conflict with a real directory in the container
+3. The name of the utility volume could potentially conflict with a user-supplied volume name for a pod
+4. Automatically adding a utility volume to every pod feels hackish
+
+### Where does sshd run in relation to a conatiner?
+There are a few ways we could run sshd in front of a container:
+
+1. At the node level, using the same sshd that administrators use to access the node
+2. At the node level, using a different sshd than the one administrators use (and therefore a different port)
+3. At the pod level, an always-on sshd container
+4. At the pod level, an on-demand sshd container
+
+Details TODO
+
+### CONTENT BELOW HERE IS BEING REVISED
+
 ### SSH proxy components
 The SSH proxy is comprised of the following pieces:
 
