@@ -51,14 +51,14 @@ f9bc9428-7b15-11e4-a6c4-001c42c44ee1
 f9bca1c2-7b15-11e4-a6c4-001c42c44ee1
 ```
 
-The SSH URL for a container in the first pod might be `somenamespace/f9bc6e3d-7b15-11e4-a6c4-001c42c44ee1/apache`, which will remain constant as long as that pod exists. We could try to simplify things and support `namespace/replicationController[index]/container`, which would make the above example `somenamespace/foo[0]/apache`, but even then, you can't be certain that you're consistently referring to the same exact pod, in the event that 1 of the members of the replica set is deleted and recreated, or if the order of the pods retrieved when matching the replication controller's label selector changes.
+The SSH URL for a container in the first pod might be `somenamespace/f9bc6e3d-7b15-11e4-a6c4-001c42c44ee1/apache`, which will remain constant as long as that pod exists. We could try to simplify things and support `namespace/replicationController[index]/container`, which would make the above example `somenamespace/foo.0/apache`, but even then, you can't be certain that you're consistently referring to the same exact pod, in the event that 1 of the members of the replica set is deleted and recreated, or if the order of the pods retrieved when matching the replication controller's label selector changes.
 
-This type of simplification might be useful, but it is not a method that guarantees that a user always gets the same container everytime `namespace/replicationController[index]/container` is resolved.
+This type of simplification might be useful, but it is not a method that guarantees that a user always gets the same container everytime `namespace/replicationController.index/container` is resolved.
 
 ### To proxy or not?
 Using namespace/pod/container as the username tells us the container, but it doesn't give any information about the host where the container lives. We can have users SSH directly to the container's node to reach the container, or we could have all SSH connections go through a proxy instead.
 
-SSHing directly to the container's node works as long as the container isn't deleted and recreated at some point. But if it does move to a different node, the previous SSH URL (e.g. `namespace/pod/container@node1.openshift.com`) is no longer valid.
+Users that get an SSH URL referencing a specific node for the hostname will only be able to use it as long as the pod is on that node. At this time and for the near future, Kubernetes does not move containers across nodes.
 
 If we want to have a constant URL for a container regardless of the host where it's running, we need a proxy with a constant URL. To SSH to a container using a proxy, we'd have a URL such as `namespace/pod/container@ssh.openshift.com`. Even if the container moves to a different node, the SSH URL remains the same. The proxy would be responsible for inspecting the username, determining the container's node, and forwarding the request to that node.
 
@@ -99,22 +99,53 @@ Some container images are designed to be extremely small, comprised of just a si
 1. Tell users their container must have a shell if they want shell access
 2. Automatically add a special utility volume to every pod (bind mount into containers) with helpful tools such as a shell
 
-Supplying a utility volume has some possible issues and downsides:
+Supplying a utility volume has some possible pros and cons:
 
+**Pros:**
+1. We can potentially add a shell to a container that does not have one
+
+**Cons:**
 1. The architecture of the shell in the utility volume might not match that of the container
 2. The mount point of the utility volume in the container could potentially conflict with a real directory in the container
 3. The name of the utility volume could potentially conflict with a user-supplied volume name for a pod
 4. Automatically adding a utility volume to every pod feels hackish
 
-### Where does sshd run in relation to a conatiner?
+### Where does sshd run in relation to a container?
 There are a few ways we could run sshd in front of a container:
 
-1. At the node level, using the same sshd that administrators use to access the node
-2. At the node level, using a different sshd than the one administrators use (and therefore a different port)
-3. At the pod level, an always-on sshd container
-4. At the pod level, an on-demand sshd container
+#### As a node level service, using the same sshd that administrators use to access the node
+A custom NSS module delegates passwd database information lookups (username, uid, gid, shell, home directory) to OpenShift. A custom PAM module delegates authentication and authorization to OpenShift. Once a client has been authenticated and authorized to access the target container, sshd executes a custom `ForceCommand` that uses `nsenter` (or possibly `docker exec`) to run a shell or the supplied command in the container. Because this command runs as the container's "uid" (from the NSS module and OpenShift), it will need privileged access to `nsenter`/`docker exec`, potentially via a setuid-enabled helper, sudo, or some other mechanism.
 
-Details TODO
+Using a single sshd for both administrators and end users eliminates the need to manage an additional sshd service, as nodes will likely already have sshd running. Sharing 1 sshd would mean that the custom NSS and PAM modules would handle lookups for non-container users (i.e. administrators) and fail before other modules such as files/ldap have a chance to perform their lookups, or vice versa, depending on the module lookup order in the NSS and PAM configuration files.
+
+#### As a node level service, using a different sshd than the one administrators use (and therefore a different port)
+This is identical to the previous option, but using a 2nd sshd process instead of a shared one. This sshd would use an independent configuration file from that of the administrators' sshd. This has the advantage of being able to apply a more restrictive set of configuration settings for this sshd. Either this sshd or the one for administrators would need to run on a nonstandard port (or they both could), which makes it more difficult for attack (but far from impossible).
+
+#### As a node level service via a pod
+This ideally would be a "core" system pod, something that's deployed as part of the cluster itself (a feature that doesn't really exist today), and there would be 1 per node. The container running sshd would need to run privileged, and it would need to share the host's pid namespace if using `nsenter` (support for this is currently pending [here](https://github.com/docker/docker/pull/9339)) or the node's docker socket if using `docker exec` (more R&D is needed to determine if the broad scope of these privileges can be reduced). The port for sshd would need to be accessible from outside the host, either by specifying the host port in the container's specification, or by using a Kubernetes service.
+
+One benefit to this approach is that the custom NSS and PAM modules could be installed only inside the sshd container, leaving the node's NSS/PAM configurations untouched.
+
+One significant detractor is that a privileged container that shares the host's pid namespace is required. This potentially opens up the door to additional attack vectors, as there are additional components involved (Docker, kernel namespaces).
+
+#### As an always-on sshd container in a pod
+For this option, OpenShift automatically adds an sshd container to every pod in the system. Ideally this container wouldn't need the privileges described in the previous option, but they may be necessary. If so, this is a "con" for this option, as we want to avoid allowing user containers to run with privileges.
+
+This option is also not desirable due to the excessive number of additional containers that will likely sit idle close to 100% of the time for the majority of pods.
+
+#### As an on-demand sshd container in a pod
+For this, we either need the ability to add a new container to an existing pod, or we need a way to create a new pod and ensure the scheduler places it on the same node as the target pod/container. Either way, this option is essentially the same as the always-on sshd container in a pod. The sshd container still needs to share the host's pid namespace for `nsenter` or it needs the host's docker socket bind mounted in for `docker exec`.
+
+### Authentication
+#### Public key authentication
+sshd uses a custom `AuthorizedKeysCommand` to ask OpenShift for a list of public keys allowed to access the target container. This command runs as `AuthorizedKeysCommandUser`, which must be an isolated user that has a private means of authenticating with OpenShift (e.g. a client certificate or token). sshd performs the key exchange with the client and allows the client to proceed if the client's key is in the list of authorized keys retrieved from OpenShift.
+
+#### Token (password) authentication
+The client presents a token as a password to `sshd`. `sshd` delegates password authentication to PAM. A custom PAM module delegates authentication to OpenShift, and OpenShift validates the presented token.
+
+#### Kerberos authentication
+**TODO**
+
 
 ### CONTENT BELOW HERE IS BEING REVISED
 
