@@ -72,13 +72,13 @@ As an alternative to agent forwarding, we could have the proxy obtain some form 
 
 #### Proxied containers: pods deployed by OpenShift
 
-OpenShift deployments, the common way users get a new version of their code running, are implemented using replication controllers.  When a deployment occurs, the replication controllers in the deployment change.  The replication controllers servicing the old deployments are deleted, and new ones are introduced to service the new deployment.  Because replication controller managed pods receive unpredictable names, the container names associated with an openshift deployment will be inconsistent across deployment versions.
+OpenShift deployments, the common way users get a new version of their code running, are implemented using replication controllers.  When a deployment occurs, the replication controllers in the deployment change.  The replication controllers servicing the old deployments are deleted, and new ones are introduced to service the new deployment.  Because replication controller managed pods receive unpredictable names, the container names associated with an OpenShift deployment will be inconsistent across deployment versions.
 
 In the future, the naming scheme for pods managed by replication controllers may change to become more deterministic.  A possible format might be:
 
     <replication controller name>-<replica number>
 
-If the naming scheme changed in this way, it would become possible to address the pods associated with an openshift deployment in a predictable manner.  If the replication controller name was driven by the deployment name, the container naming scheme might be approximately:
+If the naming scheme changed in this way, it would become possible to address the pods associated with an OpenShift deployment in a predictable manner.  If the replication controller name was driven by the deployment name, the container naming scheme might be approximately:
 
     <namespace>-<deployment config name>-<deployment version>-<replica number>
     <----       replication controller name       ---------->
