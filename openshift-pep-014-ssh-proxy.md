@@ -123,9 +123,11 @@ Some container images are designed to be extremely small, comprised of just a si
 Supplying a utility volume has some possible pros and cons:
 
 **Pros:**
+
 1. We can potentially add a shell to a container that does not have one
 
 **Cons:**
+
 1. The architecture of the shell in the utility volume might not match that of the container
 2. The mount point of the utility volume in the container could potentially conflict with a real directory in the container
 3. The name of the utility volume could potentially conflict with a user-supplied volume name for a pod
