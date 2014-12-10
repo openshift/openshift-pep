@@ -54,7 +54,7 @@ f9bc9428-7b15-11e4-a6c4-001c42c44ee1
 f9bca1c2-7b15-11e4-a6c4-001c42c44ee1
 ```
 
-The SSH URL for a container in the first pod might be `somenamespace/f9bc6e3d-7b15-11e4-a6c4-001c42c44ee1/apache`, which will remain constant as long as that pod exists. We could try to simplify things and support `namespace/replicationController[index]/container`, which would make the above example `somenamespace/foo.0/apache`, but even then, you can't be certain that you're consistently referring to the same exact pod, in the event that 1 of the members of the replica set is deleted and recreated, or if the order of the pods retrieved when matching the replication controller's label selector changes.
+The SSH URL for a container in the first pod might be `somenamespace/f9bc6e3d-7b15-11e4-a6c4-001c42c44ee1/apache`, which will remain constant as long as that pod exists. We could try to simplify things and support `namespace/replicationController.index./container`, which would make the above example `somenamespace/foo.0/apache`, but even then, you can't be certain that you're consistently referring to the same exact pod, in the event that 1 of the members of the replica set is deleted and recreated, or if the order of the pods retrieved when matching the replication controller's label selector changes.
 
 This type of simplification might be useful, but it is not a method that guarantees that a user always gets the same container everytime `namespace/replicationController.index/container` is resolved.
 
@@ -89,7 +89,7 @@ If the naming scheme changed in this way, it would become possible to address th
     # Replica 8 for deployment config backend version 12 in namespace production
     production-backend-12-8
 
-Even with this scheme, in order to provide stable ssh URLs, Openshift would need a pluggable resolution strategy  to resolve a version independent URL (`test-frontend-2`) to the correct versioned name: `test-frontend-1-2`.  It is worth discussing the merits of a strategy for methods like OpenShift deployments that manipulate replication controllers.
+Even with this scheme, in order to provide stable SSH URLs, Openshift would need a pluggable resolution strategy to resolve a version independent URL (`test-frontend-2`) to the correct versioned name: `test-frontend-1-2`.  It is worth discussing the merits of a strategy for methods like OpenShift deployments that manipulate replication controllers.
 
 #### Proxied containers: port forwarding, scp, sftp
 
@@ -145,6 +145,8 @@ Using a single sshd for both administrators and end users eliminates the need to
 
 This is identical to the previous option, but using a 2nd sshd process and port instead of running a single `sshd`. This sshd would use an independent configuration file from that of the administrators' sshd. This has the advantage of being able to apply a more restrictive set of configuration settings for this sshd. Either this sshd or the one for administrators would need to run on a nonstandard port (or they both could), which makes it more difficult for attack (but far from impossible).
 
+**This is the recommended option.**
+
 #### `sshd` as a node level service via a pod
 
 This ideally would be a "core" system pod, something that's deployed as part of the cluster itself (a feature that doesn't really exist today), and there would be 1 per node. The container running sshd would need to run privileged, and it would need to share the host's pid namespace if using `nsenter` (support for this is currently pending [here](https://github.com/docker/docker/pull/9339)) or the node's docker socket if using `docker exec` (more R&D is needed to determine if the broad scope of these privileges can be reduced). The port for sshd would need to be accessible from outside the host, either by specifying the host port in the container's specification, or by using a Kubernetes service.
@@ -167,100 +169,17 @@ For this, we either need the ability to add a new container to an existing pod, 
 #### Public key authentication
 sshd uses a custom `AuthorizedKeysCommand` to ask OpenShift for a list of public keys allowed to access the target container. This command runs as `AuthorizedKeysCommandUser`, which must be an isolated user that has a private means of authenticating with OpenShift (e.g. a client certificate or token). sshd performs the key exchange with the client and allows the client to proceed if the client's key is in the list of authorized keys retrieved from OpenShift.
 
+##### Avoiding denial of service attacks when requesting authorized public keys from OpenShift
+During the SSH connection handshake and key exchange, sshd executes the `AuthorizedKeysCommand` at least 2 times per public key presented by the client: once so the server can determine if it should accept a particular key, and a second time during the actual key exchange process. With a small number of users, keys, and SSH connection attempts, this won't be an issue, but as the scale increases, the system needs to be able to handle a high volume of requests for authorized keys. It should additional protect against denial of service attacks.
+
+Each node could have a daemon running whose purpose is to query OpenShift for authorized keys and cache them for relatively short periods of time (a few minutes). The `AuthorizedKeysCommand`, instead of communicating directly with OpenShift, could talk to this daemon to request authorized keys. This way, repeated SSH connection attempts over a short period of time would use the cached data instead of always asking OpenShift.
+
+There are some potential issues with this approach. A key that was just granted access to a container but that isn't yet in the cache might incorrectly be denied access until the cache is refreshed. Similarly, a key whose access was just revoked in OpenShift may still be in the cached data, allowing access for the key when it should be denied.
+
+An alternative to a cache with a time-based expiration policy could be to use the cache reflector available in Kubernetes to keep the daemon in sync with the OpenShift server.
+
 #### Token (password) authentication
 The client presents a token as a password to `sshd`. `sshd` delegates password authentication to PAM. A custom PAM module delegates authentication to OpenShift, and OpenShift validates the presented token.
 
 #### Kerberos authentication
 **TODO**
-
-
-### CONTENT BELOW HERE IS BEING REVISED
-
-### SSH proxy components
-The SSH proxy is comprised of the following pieces:
-
-- sshd from OpenSSH
-- a custom AuthorizedKeysCommand
-- a custom NSS module to delegate user lookups to OpenShift
-- a custom PAM module to
-	- delegate password authentication to OpenShift
-	- securely lookup and store a user identifier in the session's environment
-- a custom executable to perform the proxying logic
-
-The SSH proxy is stateless, in as much as multiple proxies can exist behind a load balancer and/or something like round-robin DNS. Doing so eliminates the proxy layer from being a single point of failure.
-
---
-
-### Basic flow
-The SSH proxy accepts incoming requests from remote clients (users), asserts authentication and authorization, and forwards the requests to the appropriate backend cluster resources:
-
-![basic flow](images/pep-014-basic-flow.png)
-
-This is a simplified version of what actually happens, as we need to handle authentication, authorization, and determine to which backend resource the original request should be forwarded.
-
---
-
-### Client request
-Let's look at what would happen when SSHing to a container. First, the client would run a command such as
-
-```
-ssh $container@ssh.openshift.com
-```
-
-where $container is the ID of the desired container.
-
-![client request](images/pep-014-client.png)
-
-### Proxy actions
-
-`sshd` running in the proxy receives the request and performs the following sequence of steps relevant to OpenShift:
-
-![proxy](images/pep-014-proxy.png)
-
-#### Steps 1 & 2: lookup $container via NSS
-`sshd` looks up information about the $container (user) via the `getpwnam` system call. This uses NSS to retrieve the information based on the configuration in `/etc/nsswitch.conf`. For the SSH proxy, this file must be configured to use a custom NSS module that asks OpenShift for this user information.
-
-#### Steps 3 - 8: authentication
-##### Public key authentication
-`sshd` uses a custom `AuthorizedKeysCommand` to ask OpenShift for a list of public keys allowed to access $container. This command runs as `AuthorizedKeysCommandUser`, which must be an isolated user that has a private means of authenticating with OpenShift (e.g. a client certificate or token). `sshd` performs the key exchange with the client and allows the client to proceed if the client's key is in the list of authorized keys retrieved from OpenShift.
-
-OpenShift also returns a "user reference token" environment variable that specifies the actual user associated with the public key. This variable is used later on as the password when the proxy SSHes to the container's node.
-
-##### Token (password) authentication
-The client presents a token as a password to `sshd`. `sshd` delegates password authentication to PAM. PAM is configured to delegate authentication to OpenShift. If authentication succeeds, OpenShift returns the "user reference token" and the PAM module sets it as an environment variable for the session.
-
-##### Kerberos authentication
-**TODO**
-
-#### Step 9: execute proxy command
-After the user has successfully logged in, `sshd` executes the `ForceCommand` specified in `sshd_config`, a custom executable that provides the proxying logic.
-
-#### Steps 10 & 11: determine container's node
-The proxy asks OpenShift on which node the container resides.
-
-#### Step 12: forward request to node
-The proxy forwards the original SSH request to the node, using $USER_REF as the password token for authentication.
-
---
-
-### Node actions
-![](images/pep-014-backend.png)
-
-#### Steps 1 & 2: lookup user ($container) via NSS
-`sshd` looks up information about the $container (user) via the `getpwnam` system call. This uses NSS to retrieve the information based on the configuration in `/etc/nsswitch.conf`. For the node, this file must be configured to use a custom NSS module that asks OpenShift for this user information.
-
-#### Step 3: authenticate
-The SSH proxy presents the user reference token as a password to `sshd`. `sshd` delegates password authentication to PAM. PAM is configured to delegate authentication to OpenShift.
-
-#### Steps 4 & 5: execute original command
-`sshd` executes a custom shell that `nsenter`s the target container's namespaces and executes $SSH_ORIGINAL_COMMAND.
-
---
-
-### MCS label assignment
-Distinct users in a multi-tenant environment (SSH proxy container, Git backend container, etc.) should not be allowed to view each others' files. Giving each Linux user its own SELinux context and setting the execution context of a user's processes provides this inter-user isolation.
-
-OpenShift 2 uses a custom PAM module, [pam_openshift](https://github.com/openshift/origin-server/tree/master/pam_openshift), to set the SELinux context when a user interacts with a gear via SSH. OpenShift 3 could continue to use this module, or it might be possible to use `pam_selinux` and the custom dynamic environment variable PAM module described below to set `SELINUX_LEVEL_REQUESTED` above `pam_selinux` in the PAM stack.
-
-### SSSD integration?
-Consider using SSSD in the SSH proxy container and the various backend containers (Git, etc.) to cache public keys.
