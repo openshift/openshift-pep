@@ -184,4 +184,10 @@ An alternative to a cache with a time-based expiration policy could be to use th
 The client presents a token as a password to `sshd`. `sshd` delegates password authentication to PAM. A custom PAM module delegates authentication to OpenShift, and OpenShift validates the presented token.
 
 #### Kerberos authentication
-**TODO**
+There are a couple of options for supporting Kerberos authentication.
+
+##### Manage per-container .k5login files
+With this option, each "container ssh user" has its own home directory. The standard Kerberos .k5login file controls which principals are allowed to access the node as the container ssh user. A controller watches OpenShift for changes to the set of principals allowed to access a container. When changes occur, the controller modifies that container ssh user's .k5login file.
+
+##### Manage access using `gsscred`
+With this option, a controller watches OpenShift for changes to the set of principals allowed to access a container. When changes occur, the controller executes the `gsscred` command to grant or revoke access for a principal to a container.
