@@ -44,7 +44,7 @@ This isn't elegant, and the user experience is suboptimal (or maybe even impossi
 
 Out of all of the possibilities listed above, the one that seems best is using namespace/pod/container as the username, along with a custom NSS module to overcome the 32 character limit (more on this below).
 
-#### Identifying pods in a replication controller
+#### Identifying replication controller managed pods
 
 A pod in a replication controller is assigned a randomly-generated UUID as its name. This makes it difficult to provide a constant SSH URL. Imagine a replication controller named `foo` that defines some pod with a replica count of 3. You might end up with 3 pods named like this:
 
@@ -58,7 +58,7 @@ The SSH URL for a container in the first pod might be `somenamespace/f9bc6e3d-7b
 
 This type of simplification might be useful, but it is not a method that guarantees that a user always gets the same container everytime `namespace/replicationController.index/container` is resolved.
 
-### Merits of proxying SSH
+### Proxying SSH
 
 Using namespace/pod/container as the username tells us the container, but it doesn't give any information about the host where the container lives. We can have users SSH directly to the container's node to reach the container, or we could have all SSH connections go through a proxy instead.
 
@@ -70,12 +70,26 @@ The proxy approach provides a better user experience, but adds complexity to the
 
 As an alternative to agent forwarding, we could have the proxy obtain some form of authentication (token or key pair) from OpenShift as soon as the user authenticates to the proxy. The proxy would then pass this authentication to the node's sshd server.
 
-**IMPORTANT CAVEAT** OpenShift deployments, the common way users get a new version of their code running, are implemented using replication controllers. As described above, this means
+#### Proxied containers: pods deployed by OpenShift
 
-1. pods are assigned unguessable UUIDs for their names
-2. **each deployment results in 1 or more brand new pods, with different names than the previous deployment**
+OpenShift deployments, the common way users get a new version of their code running, are implemented using replication controllers.  When a deployment occurs, the replication controllers in the deployment change.  The replication controllers servicing the old deployments are deleted, and new ones are introduced to service the new deployment.  Because replication controller managed pods receive unpredictable names, the container names associated with an openshift deployment will be inconsistent across deployment versions.
 
-As a result, containers created using OpenShift deployments essentially never have consistent names because they don't have consistent pod names. This means proxying connections to these types of containers through an SSH proxy don't provide any significant benefit.
+In the future, the naming scheme for pods managed by replication controllers may change to become more deterministic.  A possible format might be:
+
+    <replication controller name>-<replica number>
+
+If the naming scheme changed in this way, it would become possible to address the pods associated with an openshift deployment in a predictable manner.  If the replication controller name was driven by the deployment name, the container naming scheme might be approximately:
+
+    <namespace>-<deployment config name>-<deployment version>-<replica number>
+    <----       replication controller name       ---------->
+
+    # Replica 2 for deployment config frontend version 1 in namespace test
+    test-frontend-1-2
+
+    # Replica 8 for deployment config backend version 12 in namespace production
+    production-backend-12-8
+
+Even with this scheme, in order to provide stable ssh URLs, Openshift would need a pluggable resolution strategy  to resolve a version independent URL (`test-frontend-2`) to the correct versioned name: `test-frontend-1-2`.  It is worth discussing the merits of a strategy for methods like OpenShift deployments that manipulate replication controllers.
 
 #### Proxied containers: port forwarding, scp, sftp
 
