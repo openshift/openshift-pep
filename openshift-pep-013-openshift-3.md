@@ -67,7 +67,7 @@ These resources are nested:
 
 #### Premise
 
-The 3.x model attempts to expose underlying Docker and Google models as accurately as possible, with a focus on easy composition of applications by a developer (install Ruby, push code, add MySQL).  Unlike 2.x, more flexibility of configuration is exposed after creation in all aspects of the model.  Terminology is still being weighed, but the concept of an application as a separate object is being removed in favor of more flexible composition of "services" - allowing two web containers to reuse a DB, or expose a DB directly to the edge of the network.  The existing API will continue to be supported through 3.x, with concepts mapped as closely as possible to the new model.
+The 3.x model attempts to expose underlying Docker and Google models as accurately as possible, with a focus on easy composition of applications by a developer (install Ruby, push code, add MySQL).  Unlike 2.x, more flexibility of configuration is exposed after creation in all aspects of the model.  Terminology is still being weighed, but the concept of an application as a separate object is being removed in favor of more flexible composition of "services" - allowing two web containers to reuse a DB, or expose a DB directly to the edge of the network.
 
 #### Building and managing images
 The core OpenShift use case is allowing operators to efficiently host applications and provide developers easy to run software environments. The key unit of exchange between a developer and operator is an image - the operator may provide a maintainable template for a runtime system to a developer, and the developer can customize or tweak that system to add their application code, and then provide the operator with an image that can then be deployed.  The image represents a parameterizable set of code and configuration that can be reused across many environments (dev, production) and reliably redeployed even over time.
@@ -448,9 +448,6 @@ Integration
 
 ### OpenStack
 We expect to broaden the set of possible integrations with OpenStack over the course of OpenShift 3.x, especially around automatic scaling of the infrastructure via HEAT.
-
-### Mesos
-TBD
 
 
 Example Flows
