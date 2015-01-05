@@ -406,7 +406,16 @@ Container Capabilities
 OpenShift 3.x will utilize Docker containers in combination with systemd to ensure a predictable, secure, and efficient process execution environment.
 
 ### Logging
-Log output should be captured by journald (under systemd) and aggregated on a host.  Integrators should be able to ship logs to a central point for aggregation across the cluster.  Docker images should log to STDOUT/STDERR/syslog and bypass disk for common logging.
+Log output should be captured by journald (under systemd) and aggregated on a host.  Integrators should be able to ship logs to a central point for aggregation across the cluster.  Docker containers should log to STDOUT/STDERR/syslog and bypass disk for common logging.
+
+### Container core-dumps 
+In order to enable the creation of the core-dump from the running docker container, the dump size has to be specified in the Docker unitfile service directive has to contain **LimitCORE=$core-dump-limit**, cause by default is set to zero, so the core dump won't be created.
+
+### Port-forwarding
+The port-forwarding scenario in OpenShift v3 could be implement in a very similar way than in v2, thus using the ssh's port-forwarding feature to map the internal ports from Docker running on the node directly to the end user's workstation. The end user would request the port-forwarding via the API or using the client tools and our broker would provide him with his of exposed containers ports.
+The only different when comparing Kuberentes with Docker [networking](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/networking.md) is in additional extended network of [pods](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/pods.md), which provides additional shared network between containers and might be used in the future if we decide to use the pots in our use-cases. Kuberentes also plans to implement external routing of these shared networks in the future.
+Until then the pot:containers relationship will be 1:1.
+The port-forwarding in v2 is handled by PortForward class in [rhc](https://github.com/openshift/rhc/blob/master/lib/rhc/commands/port_forward.rb), and with additional changes, regarding Kubernetes with Docker, could be reused in the v3.
 
 ### Resource Usage Metrics
 Data about the CPU, memory, disk, and network utilization of containers from Linux cGroups will be exposed to the scheduler and integrators through the Kubernetes core system, allowing the scheduler to make decisions about placement and react to changes in the infrastructure.
