@@ -75,14 +75,14 @@ The core OpenShift use case is allowing operators to efficiently host applicatio
 ![image objects and relationships](https://raw.githubusercontent.com/openshift/openshift-pep/master/images/pep-013-image-model-relationships.png)
 
 ##### **Docker Image**
-An executable image that represents a runnable component (web app, mysql, etc), a set of exposed ports, and an set of directories that represent persistent storage across container restarts
+An executable image that represents a runnable component (web app, mysql, etc), a set of exposed ports, and a set of directories that represent persistent storage across container restarts
 
 * an image may have extended metadata beyond that specified in the Dockerfile/registry
     * how many instances of the image are required for normal function (1, 1..N)
     * the environment variables it exposes that must be generated or specified (beyond the defaults in the Dockerfile itself)
     * additional port metadata describing what type of network services are exposed
   * named commands that may be run inside of an image for performing specific actions
-* each image (contents and metadata) are immutable and changing them requires creating a new image (the reference to older image data or older metadata may be preserved)
+* each image (contents and metadata) is immutable and changing it requires creating a new image (the reference to older image data or older metadata may be preserved)
 * image metadata may change over successive versions of an image - multiple images may share the same metadata
 * any image can be executed (which runs its default command/entrypoint), but different images may have different roles and thus not be suitable for execution as a network service
   * An example is an image that contains scripts for backing up a database - the image might be used by a service like cron to periodically execute tasks against a remote DB, but the image itself is not useful for hosting the DB
@@ -217,7 +217,7 @@ The OpenShift 3.x application model recognizes all three scales, and focuses on 
 ##### **Container** / **Gear**
 A running execution environment based on an image and runtime parameters
 
-* a container encapsulates a set of processes and manages their lifecycle and allows a unit of software to be deployed repeatably to a host
+* a container encapsulates a set of processes and manages their lifecycle, and allows a unit of software to be deployed repeatably to a host
 * gear is the historical OpenShift term for a container and will continue to be exposed via the user interface
   
 ##### **Pod**
@@ -260,14 +260,14 @@ A historical or in-progress rolling update to a service that replaces one servic
 * Some deployments may fail because the ports the old image exposes differ from the ports the new image exposes
 * A deployment in the model records the intent of what a deployment should be - a **deployment job** carries out the deployment and may be cancelled or stopped.  There may be pods representing multiple deployments active in a service at any one time.
 * A deployment retains a reference to an image - the retention policy of deployments controls which references are valid, and as long as an image is referenced it will not be deleted.
-* A deployment does *not* control the the horizontal scale of a service, and during a deployment the number of pods created may exceed the current horizontal scale depending on the type of deployment requested.
+* A deployment does *not* control the horizontal scale of a service, and during a deployment the number of pods created may exceed the current horizontal scale depending on the type of deployment requested.
 * There are different deployment types:
 	* External - user defines the new deployment, and creates or manipulates the underlying replication controllers corresponding to the service to add or remove pods for old and new versions
-	* Simple rolling deploy - pods corresponding to the new template are created, added to the load balancer(s), and then the old pods are removed from the load balancer and then deleted
+	* Simple rolling deploy - pods corresponding to the new template are created, added to the load balancer(s), and then the old pods are removed from the load balancer and get deleted
 	* TBD
 
 ##### **Link**
-A relationship between two services that defines an explicit connection, how that connection is exposed  environment, a proxy or load balancer), and potentially whether start order is significant.
+A relationship between two services that defines an explicit connection, how that connection is exposed to the environment (via a proxy or load balancer), and potentially whether start order is significant.
 
 * Use Case: A link allows one service to export environment variables to another service
 * Use Case: A link may be used by the infrastructure to create or configure proxies to service a load balanced access point for the instances of a service
@@ -289,7 +289,7 @@ A template defines how one or more services can be created, linked, and deployed
 Additional enablement for services
 
 ##### **Router**
-A load balancing proxy server associated with the system capable ofhandling traffic for many services and protocols at once
+A load balancing proxy server associated with the system capable of handling traffic for many services and protocols at once
 
 * An installation of OpenShift may have multiple routers available at any time
 * The system administrator may configure the system to assign DNS entries to services automatically - these entries are associated with a router via an **alias**
@@ -312,7 +312,7 @@ A unit of work that encapsulates changes to the system that require significant 
 
 * A job is executed as a run-once container (runs to completion and succeeds or fails) and is associated with the account, project, build, or service that triggered it
 * Modelling jobs as container executions means that all framework actions are extensible and that resource limits can be applied to the execution of the task, and that the scheduler can prioritize framework actions according to available resources or prioritization
-* Jobs may need to declare prerequisites or be scheduled to execute in a recurring fashion by being templated.
+* Jobs may need to declare prerequisites or be scheduled to execute in a recurring fashion by being templated
 * Jobs may be queued, cancelled, or retried by the infrastructure
 
 #### Relationships
