@@ -32,10 +32,10 @@ V2](https://github.com/openshift/openshift-pep/blob/master/openshift-pep-002-car
 Background
 ----------
 
-We hope to leverage the full capabilities of the Docker container to evolve a new public standard 
-that benefits developers and operators in the public cloud.  We should take into account the 
-limitations of the current mutable gear model and look for opportunities to isolate components 
-further (gears don't change, source code split out into its own locations, routing moves out of gears 
+We hope to leverage the full capabilities of the Docker container to evolve a new public standard
+that benefits developers and operators in the public cloud.  We should take into account the
+limitations of the current mutable gear model and look for opportunities to isolate components
+further (gears don't change, source code split out into its own locations, routing moves out of gears
 and nodes).
 
 A key design goal is to reduce the changes that occur inside of a gear after it is created - in
@@ -63,10 +63,10 @@ An OpenShift v2 cartridge is metadata that describes the capabilities of a set o
 a Dockerfile is metadata describing how to prepare a set of software for use in an image.  
 
 OpenShift v3 cartridges will consist of an arbitrary Docker image, plus a set of [Source-To-Image](https://github.com/openshift/geard/tree/master/sti)
-scripts which define the assemble(build) and run behavior of the cartridge.  The act of transforming 
-a Docker image with STI scripts and/or source will be known as the **build** step, 
-and result in a **deployment artifact** which is a Docker image.  Since **build** process 
-may contain dependencies, downloads, or unreliable options that may fail, subsequent **build** operations may wish 
+scripts which define the assemble(build) and run behavior of the cartridge.  The act of transforming
+a Docker image with STI scripts and/or source will be known as the **build** step,
+and result in a **deployment artifact** which is a Docker image.  Since **build** process
+may contain dependencies, downloads, or unreliable options that may fail, subsequent **build** operations may wish
 to reuse the contents of the prior image.  This is referred to as an **incremental build**.
 
 
@@ -86,14 +86,14 @@ to reuse the contents of the prior image.  This is referred to as an **increment
     | Libc / Bash  |   | Libc / Bash  |   | Libc / Bash     |  Base Layer
     +--------------+   +--------------+   +-----------------+
 
-    +--------------+   +--------------+   +-----------------+ 
-    | Kernel       |   | Kernel       |   | Kernel          | 
-    +--------------+   +--------------+   +-----------------+ 
+    +--------------+   +--------------+   +-----------------+
+    | Kernel       |   | Kernel       |   | Kernel          |
+    +--------------+   +--------------+   +-----------------+
 
     1. Base from CDN   2. Generic         3. Deployment
                           Docker             Artifact
                           Image             
-                                                                                
+
 
 ### Creating a cartridge flow
 
@@ -143,7 +143,7 @@ to reuse the contents of the prior image.  This is referred to as an **increment
                                                     +--------------+
                                                     | Libc / Bash  |
                                                     +--------------+
-                                    
+
                                                     Deployable image
 
 ### Incremental Builds
@@ -193,14 +193,14 @@ script during the build.
                                                     +--------------+
                                                     | Libc / Bash  |
                                                     +--------------+
-                                        
+
                                                     Deployable image
 
 ### Extended Builds
 
 In some cases, it may not make sense for packages required to build an application also
 be present in the deployed image.  For example, maven may be required to build some
-java applications, but it is not needed to run them.  To address these scenarios, 
+java applications, but it is not needed to run them.  To address these scenarios,
 extended builds will be supported.  In an extended build, one image is used to perform
 the build and output the deployable application artifacts.  Those artifacts are then
 added to the runtime framework image to create the deployable artifact.
@@ -232,7 +232,7 @@ added to the runtime framework image to create the deployable artifact.
                                                     +--------------+
                                                     | Libc / Bash  |
     Docker Image                                    +--------------+
-                                    
+
                                                     Deployable image
 
 
@@ -268,13 +268,13 @@ performing a build step (such as maven build).
                                                     +--------------+
                                                     | Libc / Bash  |
                                                     +--------------+
-                                     
+
                                                     Deployable image
 
 
 
-In V2 scalable applications, haproxy gears were responsible for distributing repository content to 
-the gears in the application. In contrast, for Docker-based applications, the broker will manage 
+In V2 scalable applications, haproxy gears were responsible for distributing repository content to
+the gears in the application. In contrast, for Docker-based applications, the broker will manage
 which deployed artifact (DA) a gear is using. An auto scaling subsystem would make requests to the
 broker to scale up or down.
 
@@ -282,11 +282,11 @@ Plugin cartridges are TBD, but they may be injected during the prepare step or b
 gear after launch.
 
 In order to deliver security updates to cartridges, the operator must be able to rebuild (docker build)
-docker images and then trigger application builds for affected applications to create a new deployable 
-images for those applications.  This is a long running operation and may also involve skipping failed builds 
+docker images and then trigger application builds for affected applications to create a new deployable
+images for those applications.  This is a long running operation and may also involve skipping failed builds
 and notifying affected users.  In order to optimize the rebuild process and exert control over application
-dependencies that may have been previously downloaded, cartridge authors can provide additional functionality 
-to allow incremental layer creation - reusing downloaded dependencies and generated files from a previous 
+dependencies that may have been previously downloaded, cartridge authors can provide additional functionality
+to allow incremental layer creation - reusing downloaded dependencies and generated files from a previous
 image.  See "incremental builds" for more details.
 
 Docker images live in a registry backed by some persistent storage.  OpenShift requires a registry
@@ -326,7 +326,7 @@ gear repo would have access to the user's public keys as they do today (potentia
 separate gear group).  During a build, OpenShift would extract the source for the application into
 the cartridge image.
 
-Another consequence of write-once gears is that application environment should exist outside any 
+Another consequence of write-once gears is that application environment should exist outside any
 gear.  Docker applies environment on startup, so it would be ideal to distribute environment
 via some private mechanism inside the node cluster and to pull that data on start.
 
@@ -335,14 +335,14 @@ php-5.4 - where a user may start on one version of the technology and later want
 down) to a different compatible version.  The two cartridges have the same contract with the source
 code, but a developer would be able to choose that new cartridge version to apply on a given build.
 
-It is important to note that gears will still have ephemeral local storage for use in caching 
+It is important to note that gears will still have ephemeral local storage for use in caching
 scenarios.
 
 ### Quickstarts and InstantApps
 
 For the first iteration, the multicartridge topologies defined by instant apps will be created by
 single docker images that contain all the component pieces.  Quickstarts (external initial source
-repo) should continue to work as today by providing a github repo during app creation.  STI 
+repo) should continue to work as today by providing a github repo during app creation.  STI
 already supports this model for building images from a remote source repository.
 
 
@@ -393,7 +393,7 @@ Containers for a cartridge can be checked for liveness via port connectivity, or
 which will be run inside the container namespace.  The cartridge manifest will define how the
 container should be probed.
 
-Applications will also be able to define an application-level health check, but that is beyond the 
+Applications will also be able to define an application-level health check, but that is beyond the
 scope of cartridges.
 
 ### Log management
@@ -410,7 +410,7 @@ for cartridges to use.
 ### Environment Variables
 
 Environment variables are managed by docker itself, and in turn can be fed in from an external
-orchestrator.  Managing them will not be a cartridge responsibility.  Environment variables can 
+orchestrator.  Managing them will not be a cartridge responsibility.  Environment variables can
 be used to feed into dynamic configuration settings at startup/runtime.
 
 ### Runtime configuration
@@ -420,23 +420,23 @@ configuration information:
 1) Cartridge startup scripts can process environment variables to populate a configuration template
 2) Cartridge assemble scripts can pull in configuration files supplied by the application source
    repository.
-   
+
 Note that 1+2 can be used in conjunction as well.
 
 ### Information sharing
 
-In V2, cartridges could publish and subscribe to specific bits of information such as database 
+In V2, cartridges could publish and subscribe to specific bits of information such as database
 passwords or lists of cluster members.  
 
 For v3, we will initially limit the information sharing use cases to information that can be
-pre-generated and fed into the runtime container via environment variables.  For example, 
+pre-generated and fed into the runtime container via environment variables.  For example,
 cartridges can define an environment variable "POSTGRES_PASSWORD" and indicate that the
 variable should be auto-generated by the platform.  At application creation time, the
 platform will generate a value for the environment variable and share it with all containers
 which are linked to this container and have expressed a subscription to this environment
 variable.
 
-Similarly, aggregated values such as an environment variable value that consists of a comma 
+Similarly, aggregated values such as an environment variable value that consists of a comma
 separated list of all the hostnames in a cluster will be managed by the platform constructing
 the aggregated value and injecting it into all interested containers.  This will be done in
 cases where the cartridge has indicated the value should be aggregated, and optionally provided
@@ -451,8 +451,8 @@ is no need for a distinction between "system" and "downloaded" cartridges.
 
 ### Moving HAProxy out of Gears
 
-HAProxy within web gears complicates application lifecycle management and scaling.  To address this, 
-we will create a routing layer to route edge traffic to gear groups based on endpoint data 
+HAProxy within web gears complicates application lifecycle management and scaling.  To address this,
+we will create a routing layer to route edge traffic to gear groups based on endpoint data
 the broker has been made aware of.  
 
 Specification
@@ -480,7 +480,7 @@ Image-name            | Docker image to be used if an image was not specified du
 Template-location     | Optional git url to use as the template app for new instances
 Storage-path          | Location of volume mounted storage the cartridge expects to be able to write persisted data to
 Liveness-check        | Mechanism for checking if the container is started/live (port(s) to probe, script(s) to run)
-                    
+
 
 ### Implementation Note: V2 Interoperability
 
@@ -593,8 +593,8 @@ The deployment process is as follows:
 ## Gear management
 
 Due to the write-once nature of Docker gears, there are significantly less operations that can be
-performed on Docker gears than on V2 gears.  Operations that would mutate a V2 gear instead result 
-in a new image being prepared for an application's web gears.  This makes it possible for there to 
+performed on Docker gears than on V2 gears.  Operations that would mutate a V2 gear instead result
+in a new image being prepared for an application's web gears.  This makes it possible for there to
 be three fundamental operations that can be performed on Docker gears: scale up, scale down, and
 replace.
 
@@ -617,7 +617,7 @@ The scale up workflow is as follows:
 
 ### Scale Down Workflow
 
-1. The broker makes a call to the routing later to disable routing application requests to the 
+1. The broker makes a call to the routing later to disable routing application requests to the
    gear being scaled down.
 2.  The broker makes a call to scale down the gear on the node:
     1.  The node gracefully stops the container
@@ -627,14 +627,14 @@ The scale up workflow is as follows:
 
 ### Replace Workflow
 
-1. The broker makes a call to the node where the gear is running to replace the gear, passing the 
+1. The broker makes a call to the node where the gear is running to replace the gear, passing the
    gear uuid and the DA id to replace to.
     1.  The node stops the container
     2.  The node restarts the container using the new DA
 
 There are several use-cases that replace has to support with need to be further explored:
 
-1. Avoid changing IP address or port bindings, as these would potentially necessitate 
+1. Avoid changing IP address or port bindings, as these would potentially necessitate
    environment changes.
 2. Endpoint changes across versions of DAs
 3. Mountpoint changes across versions of DAs
@@ -649,7 +649,7 @@ To upgrade a Docker gear (when a security update is released to a package):
 
 1. Identify all the base images that would be affected
 2. For each cartridge:
-   1. Rebuild the image from its dockerfile 
+   1. Rebuild the image from its dockerfile
       * Not all base images will be under OpenShift control as any docker image can be a base image for a cartridge
    2. Store the new version of the cartridge image alongside the old one
    3. Mark all the applications using the old cartridge image as needing a rebuild
@@ -668,12 +668,12 @@ the new assemble and run scripts, respectively.  Details which need to be worked
   1. How will publish/subscribe hooks be handled
   1. How will references to legacy OPENSHIFT_* environment variables be managed
   1. How will 2.x action_hooks be mapped to 3.x action hook invocations, assuming 3.x even has action hooks
-  1. Support libraries traditionally found on the openshift node need to be supplied in the base image (this would 
+  1. Support libraries traditionally found on the openshift node need to be supplied in the base image (this would
   include both the runtime binaries for the framework and also helper scripts like the openshift bash sdk)
   1. 2.x cartridges can create new environment variables during setup/install, how can this be supported in the
   3.x environment variable architecture?
-  
-  
+
+
 
 Additional Topics
 -----------------
@@ -685,17 +685,17 @@ These topics need further investigation:
     RPM install inside container
   * Container namespacing should eventually allow users to be "root" inside their containers without
     exposing the host system  
-    
+
 * Disk usage of layers can be extreme:
   * Example is Java, where you may have 100M of base cartridge files, but Maven brings down
     1GB of data
   * Need to explore how builds and cartridges can coexist(???) without making carts hard to write,
     and how we deal with lots of disk usage during build.
-        
+
 * Density of docker containers
   * Memory cost due to shared libraries no longer being shared
   * Higher disk usage for unshared duplicate dependencies
-  
+
 * How can container hooks be supported - which are necessary and which are not
   * Should hooks be run at build time by passing in the info about the current app, and then
     the env vars are changed as the app is rolled out?
@@ -712,7 +712,7 @@ These topics need further investigation:
   * DB files should be on volume mounted storage(specified in manifest)
     * This means DB creation (including credential creation) cannot occur until the application is started
     * Unless there is a pre-deployment phase where the image is started w/ volume mounted storage just for executing predeploy hooks
-  
+
 * Examples of individual scenarios for each type of cartridge
 * Plugin cartridges - composition (more images and slower builds) or injection (limited
   capabilities)
@@ -749,7 +749,7 @@ These topics need further investigation:
 * SSH can be optionally implemented
   * Similar model but different behavior, LXC attach, krishna looking at it.
   * switchns today, eventually docker exec
-* How do we rebuild without grabbing new dependencies?  How do we do a security update that doesn't 
+* How do we rebuild without grabbing new dependencies?  How do we do a security update that doesn't
 need a build efficiently?  If we take a security update and break because of a build dependency change,
 that's worse than the security update breaking the app.
 * Point to point image distribution between nodes is preferred, although it requires us to manage our
